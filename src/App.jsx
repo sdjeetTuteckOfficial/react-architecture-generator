@@ -1,26 +1,84 @@
 // App.js
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import FlowCanvas from './components/FlowCanvas';
 import Sidebar from './components/Sidebar';
 import ChatInput from './components/ChatInput';
+import EditModal from './components/EditModal';
 import { fetchArchitectureJSON } from './api/gemini';
 
 export default function App() {
   const [elements, setElements] = useState({ nodes: [], edges: [] });
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleUpdateNode = (updatedNode) => {
+    setElements((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) => (n.id === updatedNode.id ? updatedNode : n)),
+    }));
+  };
+
+  const handleDeleteNode = (id) => {
+    setElements((prev) => ({
+      nodes: prev.nodes.filter((n) => n.id !== id),
+      edges: prev.edges.filter((e) => e.source !== id && e.target !== id),
+    }));
+    setSelected(null);
+  };
+
+  const handleDeleteEdge = (edgeId) => {
+    setElements((prev) => ({
+      ...prev,
+      edges: prev.edges.filter((e) => e.id !== edgeId),
+    }));
+  };
 
   const handlePromptSubmit = async (prompt) => {
     try {
       setLoading(true);
       const data = await fetchArchitectureJSON(prompt);
-      setElements({ nodes: data.nodes, edges: data.edges });
+
+      const enrichedNodes = data.nodes.map((node) => ({
+        ...node,
+        type: 'custom',
+        position: node.position || { x: 100, y: 100 },
+        data: {
+          ...node.data,
+          onEdit: (id) => {
+            const found = data.nodes.find((n) => n.id === id);
+            setSelected(found);
+            setIsModalOpen(true);
+          },
+          onDelete: (id) => handleDeleteNode(id),
+        },
+      }));
+
+      const nodeIds = new Set(enrichedNodes.map((n) => n.id));
+      const validEdges = data.edges
+        .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
+        .map((e, index) => ({
+          id: e.id || `edge-${index}`,
+          ...e,
+        }));
+
+      setElements({ nodes: enrichedNodes, edges: validEdges });
     } catch (error) {
       console.error('Failed to load architecture', error);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Delete' && selected) {
+        handleDeleteNode(selected.id);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selected]);
 
   return (
     <div className='flex h-screen'>
@@ -32,19 +90,27 @@ export default function App() {
           </span>
         </div>
       )}
-      <Sidebar
-        selected={selected}
-        setElements={setElements}
-        elements={elements}
-      />
-      <div className='flex-1 h-full'>
+
+      <Sidebar />
+
+      <div className='flex-1 h-full relative'>
         <FlowCanvas
           elements={elements}
-          onElementsChange={setElements} // ✅ Pass this prop
+          onElementsChange={setElements}
           setSelected={setSelected}
+          openModal={() => setIsModalOpen(true)}
+          onDeleteEdge={handleDeleteEdge}
         />
         <ChatInput onSubmit={handlePromptSubmit} />
       </div>
+
+      <EditModal
+        isOpen={isModalOpen}
+        node={selected}
+        onClose={() => setIsModalOpen(false)}
+        onUpdate={handleUpdateNode}
+        onDelete={handleDeleteNode}
+      />
     </div>
   );
 }
