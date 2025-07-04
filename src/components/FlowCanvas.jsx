@@ -25,6 +25,9 @@ function FlowCanvasInner({
   const [edges, setEdges, onEdgesChange] = useEdgesState(elements.edges);
   const { fitView, project } = useReactFlow();
 
+  const [selectedNodes, setSelectedNodes] = React.useState([]);
+  const [selectedEdges, setSelectedEdges] = React.useState([]);
+
   useEffect(() => {
     const nodesWithEdit = elements.nodes.map((node) => ({
       ...node,
@@ -55,7 +58,7 @@ function FlowCanvasInner({
       event.preventDefault();
       const type = event.dataTransfer.getData('application/reactflow');
       const position = project({
-        x: event.clientX - 250, // offset for sidebar width
+        x: event.clientX - 250,
         y: event.clientY,
       });
 
@@ -83,6 +86,42 @@ function FlowCanvasInner({
     [project, setNodes, onElementsChange, openModal, setSelected, nodes]
   );
 
+  // ✅ Listen for Delete key
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Delete') {
+        if (selectedNodes.length > 0) {
+          setNodes((nds) =>
+            nds.filter((node) => !selectedNodes.includes(node.id))
+          );
+          onElementsChange((prev) => ({
+            ...prev,
+            nodes: prev.nodes.filter(
+              (node) => !selectedNodes.includes(node.id)
+            ),
+          }));
+          setSelectedNodes([]);
+        }
+
+        if (selectedEdges.length > 0) {
+          setEdges((eds) =>
+            eds.filter((edge) => !selectedEdges.includes(edge.id))
+          );
+          onElementsChange((prev) => ({
+            ...prev,
+            edges: prev.edges.filter(
+              (edge) => !selectedEdges.includes(edge.id)
+            ),
+          }));
+          setSelectedEdges([]);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedNodes, selectedEdges]);
+
   return (
     <div
       className='w-full h-full'
@@ -95,6 +134,11 @@ function FlowCanvasInner({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeClick={(e, node) => setSelected([node])}
+        onSelectionChange={({ nodes, edges }) => {
+          setSelectedNodes(nodes.map((n) => n.id));
+          setSelectedEdges(edges.map((e) => e.id));
+        }}
         nodeTypes={nodeTypes}
         fitView
         className='bg-gray-100 w-full h-full'
