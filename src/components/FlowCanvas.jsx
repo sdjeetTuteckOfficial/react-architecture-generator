@@ -85,7 +85,7 @@ function FlowCanvasInner({
 
   return (
     <div
-      className='absolute inset-0'
+      className='w-full h-full'
       onDrop={onDrop}
       onDragOver={(e) => e.preventDefault()}
     >
@@ -110,7 +110,7 @@ function FlowCanvasInner({
 export default function FlowCanvas(props) {
   return (
     <ReactFlowProvider>
-      <div className='relative w-full h-full'>
+      <div className='w-full h-full relative'>
         <FlowCanvasInner {...props} />
       </div>
     </ReactFlowProvider>

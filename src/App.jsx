@@ -79,31 +79,37 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selected]);
-
   return (
-    <div className='flex h-screen'>
-      {loading && (
-        <div className='absolute inset-0 flex items-center justify-center bg-white bg-opacity-60 z-50'>
-          <div className='border-4 border-blue-500 border-t-transparent rounded-full w-12 h-12 animate-spin' />
-          <span className='ml-4 text-xl font-medium'>
-            Generating architecture...
-          </span>
-        </div>
-      )}
-
+    <div className='h-screen flex'>
       <Sidebar />
 
-      <div className='flex-1 h-full relative'>
-        <FlowCanvas
-          elements={elements}
-          onElementsChange={setElements}
-          setSelected={setSelected}
-          openModal={() => setIsModalOpen(true)}
-          onDeleteEdge={handleDeleteEdge}
-        />
+      <div className='flex-1 flex flex-col'>
+        {/* Loading Overlay */}
+        {loading && (
+          <div className='absolute inset-0 flex items-center justify-center bg-white bg-opacity-60 z-50'>
+            <div className='border-4 border-blue-500 border-t-transparent rounded-full w-12 h-12 animate-spin' />
+            <span className='ml-4 text-xl font-medium'>
+              Generating architecture...
+            </span>
+          </div>
+        )}
+
+        {/* Top Canvas Area (Take available vertical space) */}
+        <div className='flex-1 relative'>
+          <FlowCanvas
+            elements={elements}
+            onElementsChange={setElements}
+            setSelected={setSelected}
+            openModal={() => setIsModalOpen(true)}
+            onDeleteEdge={handleDeleteEdge}
+          />
+        </div>
+
+        {/* Bottom Chat Input */}
         <ChatInput onSubmit={handlePromptSubmit} />
       </div>
 
+      {/* Edit Modal */}
       <EditModal
         isOpen={isModalOpen}
         node={selected}

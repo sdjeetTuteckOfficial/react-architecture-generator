@@ -11,7 +11,7 @@ export default function ChatInput({ onSubmit }) {
   };
 
   return (
-    <div className='absolute bottom-0 left-64 right-0 p-4 bg-white shadow-md flex items-center'>
+    <div className='w-full p-4 bg-white shadow-md border-t flex items-center'>
       <input
         type='text'
         className='flex-1 p-2 border rounded mr-2'
