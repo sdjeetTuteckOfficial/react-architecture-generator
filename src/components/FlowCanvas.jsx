@@ -152,10 +152,10 @@ function FlowCanvasInner() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
-          onNodeClick={(e, node) => {
-            setSelectedNode(node);
-            setIsModalOpen(true);
-          }}
+          // onNodeClick={(e, node) => {
+          //   setSelectedNode(node);
+          //   setIsModalOpen(true);
+          // }}
           onSelectionChange={({ nodes = [], edges = [] }) => {
             const nextSelectedNodeIds = nodes.map((n) => n.id);
             const nextSelectedEdgeIds = edges.map((e) => e.id);
