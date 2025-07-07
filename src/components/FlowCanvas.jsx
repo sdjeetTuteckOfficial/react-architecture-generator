@@ -130,13 +130,11 @@ function FlowCanvasInner() {
     <>
       {/* 🔄 Loading */}
       {loading && (
-        <div className='w-full h-full relative overflow-hidden'>
-          <div className='absolute inset-0 flex items-center justify-center bg-white bg-opacity-70 z-50'>
-            <div className='w-12 h-12 rounded-full border-4 border-blue-500 border-t-transparent animate-spin' />
-            <span className='ml-4 text-lg font-medium text-gray-700'>
-              Generating architecture...
-            </span>
-          </div>
+        <div className='fixed inset-0 z-[1000] flex items-center justify-center bg-white bg-opacity-70'>
+          <div className='w-12 h-12 rounded-full border-4 border-blue-500 border-t-transparent animate-spin' />
+          <span className='ml-4 text-lg font-medium text-gray-700'>
+            Generating architecture...
+          </span>
         </div>
       )}
 
