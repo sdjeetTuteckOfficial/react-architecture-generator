@@ -1,4 +1,3 @@
-// EditModal.js
 import React, { useEffect, useState } from 'react';
 
 export default function EditModal({
@@ -27,6 +26,17 @@ export default function EditModal({
         ...node.data,
         label,
         image,
+        onEdit: () => {
+          onUpdate({
+            ...node,
+            data: {
+              ...node.data,
+              label,
+              image,
+            },
+          });
+          onClose();
+        },
       },
     };
     onUpdate(updatedNode);
@@ -38,7 +48,9 @@ export default function EditModal({
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = () => setImage(reader.result);
+    reader.onload = () => {
+      setImage(reader.result);
+    };
     reader.readAsDataURL(file);
   };
 

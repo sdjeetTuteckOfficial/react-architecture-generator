@@ -29,7 +29,6 @@ function FlowCanvasInner() {
 
   const { fitView, project } = useReactFlow();
 
-  // 🧠 Prompt -> fetch architecture
   const handlePromptSubmit = async (prompt) => {
     try {
       setLoading(true);
@@ -63,13 +62,11 @@ function FlowCanvasInner() {
     }
   };
 
-  // 🔗 Connect handler
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
     []
   );
 
-  // 📦 Drag + drop node creation
   const onDrop = useCallback(
     (event) => {
       event.preventDefault();
@@ -98,7 +95,6 @@ function FlowCanvasInner() {
     [project]
   );
 
-  // ⌨️ Delete key
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Delete') {
@@ -112,9 +108,23 @@ function FlowCanvasInner() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedNodes, selectedEdges]);
 
+  // ✅ Fix: update node without losing onEdit handler
   const handleUpdateNode = (updatedNode) => {
     setNodes((prev) =>
-      prev.map((n) => (n.id === updatedNode.id ? updatedNode : n))
+      prev.map((n) =>
+        n.id === updatedNode.id
+          ? {
+              ...n,
+              data: {
+                ...updatedNode.data,
+                onEdit: () => {
+                  setSelectedNode(updatedNode);
+                  setIsModalOpen(true);
+                },
+              },
+            }
+          : n
+      )
     );
     setIsModalOpen(false);
   };
@@ -128,7 +138,6 @@ function FlowCanvasInner() {
 
   return (
     <>
-      {/* 🔄 Loading */}
       {loading && (
         <div className='fixed inset-0 z-[1000] flex items-center justify-center bg-white bg-opacity-70'>
           <div className='w-12 h-12 rounded-full border-4 border-blue-500 border-t-transparent animate-spin' />
@@ -138,7 +147,6 @@ function FlowCanvasInner() {
         </div>
       )}
 
-      {/* 🧠 React Flow Canvas */}
       <div
         className='w-full h-full'
         onDrop={onDrop}
@@ -150,31 +158,20 @@ function FlowCanvasInner() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
-          // onNodeClick={(e, node) => {
-          //   setSelectedNode(node);
-          //   setIsModalOpen(true);
-          // }}
           onSelectionChange={({ nodes = [], edges = [] }) => {
             const nextSelectedNodeIds = nodes.map((n) => n.id);
             const nextSelectedEdgeIds = edges.map((e) => e.id);
 
-            setSelectedNodes((prev) => {
-              if (
-                JSON.stringify(prev) !== JSON.stringify(nextSelectedNodeIds)
-              ) {
-                return nextSelectedNodeIds;
-              }
-              return prev;
-            });
-
-            setSelectedEdges((prev) => {
-              if (
-                JSON.stringify(prev) !== JSON.stringify(nextSelectedEdgeIds)
-              ) {
-                return nextSelectedEdgeIds;
-              }
-              return prev;
-            });
+            setSelectedNodes((prev) =>
+              JSON.stringify(prev) !== JSON.stringify(nextSelectedNodeIds)
+                ? nextSelectedNodeIds
+                : prev
+            );
+            setSelectedEdges((prev) =>
+              JSON.stringify(prev) !== JSON.stringify(nextSelectedEdgeIds)
+                ? nextSelectedEdgeIds
+                : prev
+            );
           }}
           nodeTypes={nodeTypes}
           fitView
@@ -194,8 +191,6 @@ function FlowCanvasInner() {
           onDelete={handleDeleteNode}
         />
       </div>
-
-      {/* 💬 Chat Prompt (bottom bar) */}
 
       <ChatInput onSubmit={handlePromptSubmit} />
     </>
