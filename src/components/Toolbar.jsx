@@ -6,7 +6,6 @@ export default function JamboardToolbar({
   onImport,
   onAddRectangle,
   onAddGroup,
-  onDownloadImage, // New prop for image download
   isLoading = false,
 }) {
   // Define the tools and actions for the toolbar
@@ -29,12 +28,6 @@ export default function JamboardToolbar({
       onClick: onImport,
       isFileImport: true,
     },
-    {
-      id: 'download-image',
-      icon: Camera,
-      label: 'Download Image',
-      onClick: onDownloadImage,
-    }, // New action for image download
   ];
 
   // Helper component for consistent button styling and tooltip
