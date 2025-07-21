@@ -12,6 +12,13 @@ export const AVAILABLE_IMAGES = [
   'frontend.png',
   'backend.png',
   'loadbalancer.png',
+  'Amazon-Aurora.svg',
+  'Amazon-DocumentDB.svg',
+  'Amazon-ElastiCache.svg',
+  'Amazon-DynamoDB.svg',
+  'Amazon-RDS.svg',
+  'Amazon-EC2.svg',
+  'Amazon-S3.svg',
 ];
 
 // Create a prompt dynamically including the image options
