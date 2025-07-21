@@ -36,7 +36,23 @@ function FlowCanvasInner() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const { fitView, project, getViewport, toObject } = useReactFlow(); // Add toObject for export
+  const { fitView, project, getViewport, toObject } = useReactFlow();
+
+  // Define a stable onEdit handler outside of data mapping, using current nodes state
+  const handleEditNode = useCallback(
+    (nodeId) => {
+      // Access the *current* nodes state when this function is called
+      setNodes((currentNodes) => {
+        const nodeToEdit = currentNodes.find((n) => n.id === nodeId);
+        if (nodeToEdit) {
+          setSelectedNode(nodeToEdit);
+          setIsModalOpen(true);
+        }
+        return currentNodes; // Return currentNodes as no nodes are being changed here
+      });
+    },
+    [setNodes] // setNodes is stable, so this callback is stable
+  );
 
   // Function to add a resizable transparent rectangle
   const addResizableRectangle = useCallback(
@@ -99,6 +115,7 @@ function FlowCanvasInner() {
     try {
       setLoading(true);
       const data = await fetchArchitectureJSON(prompt);
+      console.log(data);
 
       const newNodes = data.nodes.map((node) => ({
         ...node,
@@ -107,14 +124,7 @@ function FlowCanvasInner() {
         data: {
           ...node.data,
           image: node.data.image ? `/images/${node.data.image}` : null,
-          onEdit: (nodeId) => {
-            // Modified to receive nodeId from CustomNode
-            const nodeToEdit = nodes.find((n) => n.id === nodeId);
-            if (nodeToEdit) {
-              setSelectedNode(nodeToEdit);
-              setIsModalOpen(true);
-            }
-          },
+          onEdit: handleEditNode, // Use the stable handleEditNode
         },
         // Ensure regular nodes have higher z-index than rectangles
         zIndex: node.zIndex || 1,
@@ -185,21 +195,14 @@ function FlowCanvasInner() {
         data: {
           label: `${type} node`,
           image: null,
-          onEdit: (nodeId) => {
-            // Pass nodeId to onEdit here too
-            const nodeToEdit = nodes.find((n) => n.id === nodeId);
-            if (nodeToEdit) {
-              setSelectedNode(nodeToEdit);
-              setIsModalOpen(true);
-            }
-          },
+          onEdit: handleEditNode, // Use the stable handleEditNode
         },
         zIndex: 1, // Regular nodes above rectangles
       };
 
       setNodes((nds) => [...nds, newNode]);
     },
-    [project, setNodes, nodes] // Add 'nodes' to dependencies for onEdit
+    [project, setNodes, handleEditNode] // Add handleEditNode to dependencies
   );
 
   // Export Flow
@@ -235,14 +238,7 @@ function FlowCanvasInner() {
               ...node,
               data: {
                 ...node.data,
-                onEdit: (nodeId) => {
-                  // Make sure this is re-attached
-                  const nodeToEdit = flow.nodes.find((n) => n.id === nodeId);
-                  if (nodeToEdit) {
-                    setSelectedNode(nodeToEdit);
-                    setIsModalOpen(true);
-                  }
-                },
+                onEdit: handleEditNode, // Use the stable handleEditNode
                 // Ensure image path is correct if loaded from local
                 image:
                   node.data.image && !node.data.image.startsWith('/')
@@ -268,7 +264,7 @@ function FlowCanvasInner() {
       };
       reader.readAsText(file);
     },
-    [setNodes, setEdges, fitView]
+    [setNodes, setEdges, fitView, handleEditNode] // Add handleEditNode to dependencies
   );
 
   // Update node count in styled rectangles when nodes change
@@ -276,9 +272,9 @@ function FlowCanvasInner() {
     setNodes((currentNodes) =>
       currentNodes.map((node) => {
         if (node.type === 'styledRectangle' && node.data.showCount) {
-          // Count overlapping nodes (simplified logic, may need refinement for exact overlap)
           const regularNodes = currentNodes.filter((n) => n.type === 'custom');
           const overlapping = regularNodes.filter((regNode) => {
+            // Check if node.style is defined before accessing width/height
             const rectWidth = node.style?.width || 300;
             const rectHeight = node.style?.height || 200;
             const rectBounds = {
@@ -289,7 +285,8 @@ function FlowCanvasInner() {
             };
 
             // Basic check if node center is within the rectangle's bounds
-            // For more accurate checking, you'd need node dimensions
+            // For more accurate checking, you'd need node dimensions if available,
+            // or iterate over all corners.
             const nodeCenterX = regNode.position.x + (regNode.width || 0) / 2;
             const nodeCenterY = regNode.position.y + (regNode.height || 0) / 2;
 
@@ -320,6 +317,7 @@ function FlowCanvasInner() {
         (selectedNodes.length > 0 || selectedEdges.length > 0)
       ) {
         e.preventDefault(); // Prevent default browser delete behavior
+        // Use functional updates to ensure you're working with the latest state
         setNodes((nds) => nds.filter((n) => !selectedNodes.includes(n.id)));
         setEdges((eds) => eds.filter((e) => !selectedEdges.includes(e.id)));
         setSelectedNodes([]);
@@ -348,30 +346,25 @@ function FlowCanvasInner() {
 
   const handleUpdateNode = useCallback(
     (updatedNode) => {
-      setNodes((prev) =>
-        prev.map((n) =>
+      setNodes((prevNodes) =>
+        prevNodes.map((n) =>
           n.id === updatedNode.id
             ? {
                 ...n,
                 data: {
                   ...updatedNode.data,
-                  // Ensure onEdit is always correctly re-attached
-                  onEdit: (nodeId) => {
-                    const nodeToEdit = prev.find((node) => node.id === nodeId);
-                    if (nodeToEdit) {
-                      setSelectedNode(nodeToEdit);
-                      setIsModalOpen(true);
-                    }
-                  },
+                  onEdit: handleEditNode, // Ensure onEdit is always correctly re-attached and stable
                 },
               }
             : n
         )
       );
+      // After updating, reset selectedNode and close modal
+      setSelectedNode(null);
       setIsModalOpen(false);
     },
-    [setNodes]
-  ); // Depend on setNodes
+    [setNodes, handleEditNode] // Depend on setNodes and the stable handleEditNode
+  );
 
   const handleDeleteNode = useCallback(
     (id) => {
@@ -383,7 +376,7 @@ function FlowCanvasInner() {
       setIsModalOpen(false);
     },
     [setNodes, setEdges]
-  ); // Depend on setNodes, setEdges
+  );
 
   return (
     <>
@@ -420,21 +413,25 @@ function FlowCanvasInner() {
             nodes: selectedNodes = [],
             edges: selectedEdges = [],
           }) => {
-            // Only update state if selection actually changed to avoid unnecessary re-renders
-            const nextSelectedNodeIds = selectedNodes.map((n) => n.id);
-            const nextSelectedEdgeIds = selectedEdges.map((e) => e.id);
+            // More robust selection change comparison
+            const nextSelectedNodeIds = selectedNodes.map((n) => n.id).sort();
+            const nextSelectedEdgeIds = selectedEdges.map((e) => e.id).sort();
 
             setSelectedNodes((prev) => {
+              const prevSorted = [...prev].sort();
               if (
-                JSON.stringify(prev) !== JSON.stringify(nextSelectedNodeIds)
+                JSON.stringify(prevSorted) !==
+                JSON.stringify(nextSelectedNodeIds)
               ) {
                 return nextSelectedNodeIds;
               }
               return prev;
             });
             setSelectedEdges((prev) => {
+              const prevSorted = [...prev].sort();
               if (
-                JSON.stringify(prev) !== JSON.stringify(nextSelectedEdgeIds)
+                JSON.stringify(prevSorted) !==
+                JSON.stringify(nextSelectedEdgeIds)
               ) {
                 return nextSelectedEdgeIds;
               }

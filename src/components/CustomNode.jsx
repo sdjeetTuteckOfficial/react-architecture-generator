@@ -121,12 +121,13 @@ export default function CustomNode({ data = {}, id = '1', selected = true }) {
           onClick={(e) => {
             e.stopPropagation();
             if (data.onEdit) {
+              console.log('hit', id);
               data.onEdit(id);
             }
           }}
           aria-label='Edit node'
         >
-          <Pencil size={14} />
+          <Pencil size={24} />
         </button>
       )}
     </div>

@@ -11,6 +11,7 @@ export default function EditModal({
   const [image, setImage] = useState(null);
 
   useEffect(() => {
+    console.log('hitting', node);
     if (node) {
       setLabel(node.data?.label || '');
       setImage(node.data?.image || null);
