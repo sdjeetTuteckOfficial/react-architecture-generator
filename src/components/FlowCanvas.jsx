@@ -18,7 +18,7 @@ import {
 } from './TransparentRectangleNode';
 import EditModal from '../components/EditModal';
 import ChatInput from './ChatInput';
-import Toolbar from './Toolbar'; // Import the new Toolbar component
+import JamboardToolbar from './Toolbar'; // Import the new JamboardToolbar component
 import { fetchArchitectureJSON } from '../api/gemini';
 
 const nodeTypes = {
@@ -401,8 +401,8 @@ function FlowCanvasInner() {
         onDrop={onDrop}
         onDragOver={(e) => e.preventDefault()}
       >
-        {/* Replace the old buttons with the new Toolbar component */}
-        <Toolbar
+        {/* Replace the old buttons with the new JamboardToolbar component */}
+        <JamboardToolbar
           onExport={onExportFlow}
           onImport={onImportFlow}
           onAddRectangle={() => addResizableRectangle('resizableRectangle')}
