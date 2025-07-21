@@ -1,26 +1,36 @@
-import React, { useState } from 'react';
-import { Pencil } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Pencil, Type } from 'lucide-react';
+
 import { Handle, Position, NodeResizer } from 'reactflow';
 
-export default function CustomNode({ data, id, selected }) {
+export default function CustomNode({ data = {}, id = '1', selected = true }) {
   const [hovered, setHovered] = useState(false);
+  const labelRef = useRef(null);
 
   const handleNodeClick = (event) => {
-    // Prevent edit modal from opening when clicking on resize handles
-    if (event.target.closest('.react-flow__resize-control')) {
+    // Prevent node selection when clicking on resize handles
+    if (
+      event.target.closest('.react-flow__resize-control') ||
+      event.target.closest('.react-flow__handle')
+    ) {
       return;
     }
-    data.onEdit(id);
+    // if (data.onEdit) {
+    //   data.onEdit(id);
+    // }
   };
 
   return (
     <div
-      className='relative bg-white border rounded shadow-md p-2 text-center'
+      className={`relative flex flex-col bg-white border-2 ${
+        selected ? 'border-blue-500 shadow-lg' : 'border-gray-300 shadow-md'
+      } rounded-xl transition-all duration-200 ease-in-out overflow-visible`}
       style={{
         width: '100%',
         height: '100%',
-        minWidth: '120px',
-        minHeight: '80px',
+        minWidth: '100px',
+        minHeight: '70px',
+        background: 'linear-gradient(145deg, #f0f4f8, #e6e9ee)',
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -28,49 +38,96 @@ export default function CustomNode({ data, id, selected }) {
     >
       {/* NodeResizer - only shows when node is selected */}
       <NodeResizer
-        color='#ff0071'
+        color='#2563eb'
         isVisible={selected}
-        minWidth={120}
-        minHeight={80}
-        maxWidth={400}
-        maxHeight={300}
+        minWidth={80}
+        minHeight={50}
+        maxWidth={300}
+        maxHeight={250}
       />
 
-      {/* Minimal handles: one input (top) and one output (bottom) */}
+      {/* Handles: Properly positioned for edge connections */}
       <Handle
         type='target'
         position={Position.Top}
-        className='w-3 h-3 bg-blue-500'
+        id='target-top'
+        style={{
+          top: 0,
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '8px',
+          height: '8px',
+          backgroundColor: '#3b82f6',
+          border: '2px solid white',
+          borderRadius: '50%',
+          zIndex: 1000,
+        }}
       />
       <Handle
         type='source'
         position={Position.Bottom}
-        className='w-3 h-3 bg-green-500'
+        id='source-bottom'
+        style={{
+          bottom: 0,
+          left: '50%',
+          transform: 'translate(-50%, 50%)',
+          width: '8px',
+          height: '8px',
+          backgroundColor: '#10b981',
+          border: '2px solid white',
+          borderRadius: '50%',
+          zIndex: 1000,
+        }}
       />
 
-      {data.image && (
-        <img
-          src={data.image}
-          alt='Node'
-          className='w-full object-cover rounded mb-1'
+      {/* Main content area */}
+      <div className='flex flex-col items-center justify-center flex-grow p-2 text-center overflow-hidden'>
+        {data.image && (
+          <img
+            src={data.image}
+            alt='Node content'
+            className='max-w-[calc(100%-10px)] max-h-[50px] object-contain mb-1'
+            style={{ pointerEvents: 'none' }}
+          />
+        )}
+
+        {/* Label: Always takes available space and wraps */}
+        <div
+          ref={labelRef}
+          className='text-xs font-semibold text-gray-800 break-words px-1'
           style={{
-            height: 'calc(100% - 60px)', // Adjust based on text height
-            maxHeight: '200px',
-          }}
-        />
-      )}
-
-      <div className='text-sm font-medium break-words'>{data.label}</div>
-
-      {hovered && (
-        <button
-          className='absolute top-1 right-1 bg-white shadow p-1 rounded hover:bg-gray-100 z-10'
-          onClick={(e) => {
-            e.stopPropagation();
-            data.onEdit(id);
+            flexShrink: 0,
+            maxHeight: data.image ? 'calc(100% - 60px)' : 'calc(100% - 30px)',
+            overflowY: 'auto',
+            lineHeight: '1.3',
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
           }}
         >
-          <Pencil size={14} />
+          {!data.image && !data.label && selected ? (
+            <Type size={18} className='text-gray-400' />
+          ) : (
+            data.label || 'Sample Node Text'
+          )}
+        </div>
+      </div>
+
+      {/* Edit button: Always visible on hover or when node is selected */}
+      {(hovered || selected) && (
+        <button
+          className='absolute top-1 right-1 bg-white text-gray-600 rounded-full p-1 shadow-sm hover:bg-gray-100 hover:text-blue-500 transition-all duration-200 ease-in-out z-20'
+          onClick={(e) => {
+            e.stopPropagation();
+            if (data.onEdit) {
+              console.log('hit', id);
+              data.onEdit(id);
+            }
+          }}
+          aria-label='Edit node'
+        >
+          <Pencil size={24} />
         </button>
       )}
     </div>
