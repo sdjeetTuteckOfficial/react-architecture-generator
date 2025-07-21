@@ -11,14 +11,14 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import CustomNode from './CustomNode';
+import CustomNode from './CustomNode'; // Make sure this component is correctly implemented
 import {
   ResizableTransparentRectangle,
   StyledResizableRectangle,
 } from './TransparentRectangleNode';
 import EditModal from '../components/EditModal';
 import ChatInput from './ChatInput';
-import JamboardToolbar from './Toolbar'; // Import the new JamboardToolbar component
+import JamboardToolbar from './Toolbar';
 import { fetchArchitectureJSON } from '../api/gemini';
 
 const nodeTypes = {
@@ -38,7 +38,7 @@ function FlowCanvasInner() {
 
   const { fitView, project, getViewport, toObject } = useReactFlow();
 
-  // Define a stable onEdit handler outside of data mapping, using current nodes state
+  // Define a stable onEdit handler using useCallback
   const handleEditNode = useCallback(
     (nodeId) => {
       // Access the *current* nodes state when this function is called
@@ -51,14 +51,13 @@ function FlowCanvasInner() {
         return currentNodes; // Return currentNodes as no nodes are being changed here
       });
     },
-    [setNodes] // setNodes is stable, so this callback is stable
+    [setNodes]
   );
 
   // Function to add a resizable transparent rectangle
   const addResizableRectangle = useCallback(
     (type = 'resizableRectangle') => {
       const viewport = getViewport();
-      // Position in center of current view
       const position = {
         x: -viewport.x / viewport.zoom + 200,
         y: -viewport.y / viewport.zoom + 150,
@@ -94,14 +93,12 @@ function FlowCanvasInner() {
         type: type,
         position,
         data: rectangleConfigs[type],
-        // Initial size
         style: {
           width: 300,
           height: 200,
           zIndex: -1,
         },
         zIndex: -1,
-        // Make it draggable and selectable
         draggable: true,
         selectable: true,
       };
@@ -124,9 +121,8 @@ function FlowCanvasInner() {
         data: {
           ...node.data,
           image: node.data.image ? `/images/${node.data.image}` : null,
-          onEdit: handleEditNode, // Use the stable handleEditNode
+          onEdit: handleEditNode, // Pass the stable handler
         },
-        // Ensure regular nodes have higher z-index than rectangles
         zIndex: node.zIndex || 1,
       }));
 
@@ -140,7 +136,6 @@ function FlowCanvasInner() {
       setTimeout(() => fitView({ padding: 0.2 }), 100);
     } catch (err) {
       console.error('Error loading architecture:', err);
-      // Optional: Show an error message to the user
       alert('Failed to generate architecture. Please try again.');
     } finally {
       setLoading(false);
@@ -162,7 +157,6 @@ function FlowCanvasInner() {
       });
 
       if (['resizableRectangle', 'styledRectangle'].includes(type)) {
-        // Position where dropped
         const newNode = {
           id: `rectangle-${Date.now()}`,
           type: type,
@@ -183,7 +177,6 @@ function FlowCanvasInner() {
           style: { width: 250, height: 180, zIndex: -1 },
           zIndex: -1,
         };
-
         setNodes((nds) => [...nds, newNode]);
         return;
       }
@@ -195,17 +188,16 @@ function FlowCanvasInner() {
         data: {
           label: `${type} node`,
           image: null,
-          onEdit: handleEditNode, // Use the stable handleEditNode
+          onEdit: handleEditNode, // Pass the stable handler
         },
-        zIndex: 1, // Regular nodes above rectangles
+        zIndex: 1,
       };
 
       setNodes((nds) => [...nds, newNode]);
     },
-    [project, setNodes, handleEditNode] // Add handleEditNode to dependencies
+    [project, setNodes, handleEditNode]
   );
 
-  // Export Flow
   const onExportFlow = useCallback(() => {
     const flow = toObject();
     const jsonString = JSON.stringify(flow, null, 2);
@@ -221,7 +213,6 @@ function FlowCanvasInner() {
     alert('Flow exported successfully!');
   }, [toObject]);
 
-  // Import Flow
   const onImportFlow = useCallback(
     (event) => {
       const file = event.target.files[0];
@@ -233,16 +224,14 @@ function FlowCanvasInner() {
         try {
           const flow = JSON.parse(e.target.result);
           if (flow.nodes && flow.edges) {
-            // Re-attach onEdit function
             const importedNodes = flow.nodes.map((node) => ({
               ...node,
               data: {
                 ...node.data,
-                onEdit: handleEditNode, // Use the stable handleEditNode
-                // Ensure image path is correct if loaded from local
+                onEdit: handleEditNode, // Pass the stable handler
                 image:
                   node.data.image && !node.data.image.startsWith('/')
-                    ? `/images/${node.data.image.split('/').pop()}` // Correct path if it was 'image.png'
+                    ? `/images/${node.data.image.split('/').pop()}`
                     : node.data.image,
               },
             }));
@@ -258,23 +247,20 @@ function FlowCanvasInner() {
           console.error('Error parsing flow file:', error);
           alert('Failed to import flow. Invalid JSON file.');
         } finally {
-          // Clear the file input after import attempt
           event.target.value = null;
         }
       };
       reader.readAsText(file);
     },
-    [setNodes, setEdges, fitView, handleEditNode] // Add handleEditNode to dependencies
+    [setNodes, setEdges, fitView, handleEditNode]
   );
 
-  // Update node count in styled rectangles when nodes change
   useEffect(() => {
     setNodes((currentNodes) =>
       currentNodes.map((node) => {
         if (node.type === 'styledRectangle' && node.data.showCount) {
           const regularNodes = currentNodes.filter((n) => n.type === 'custom');
           const overlapping = regularNodes.filter((regNode) => {
-            // Check if node.style is defined before accessing width/height
             const rectWidth = node.style?.width || 300;
             const rectHeight = node.style?.height || 200;
             const rectBounds = {
@@ -284,9 +270,6 @@ function FlowCanvasInner() {
               bottom: node.position.y + rectHeight,
             };
 
-            // Basic check if node center is within the rectangle's bounds
-            // For more accurate checking, you'd need node dimensions if available,
-            // or iterate over all corners.
             const nodeCenterX = regNode.position.x + (regNode.width || 0) / 2;
             const nodeCenterY = regNode.position.y + (regNode.height || 0) / 2;
 
@@ -308,7 +291,7 @@ function FlowCanvasInner() {
         return node;
       })
     );
-  }, [nodes.length, setNodes]); // Depend on nodes.length to trigger updates when nodes are added/removed
+  }, [nodes.length, setNodes]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -316,24 +299,21 @@ function FlowCanvasInner() {
         e.key === 'Delete' &&
         (selectedNodes.length > 0 || selectedEdges.length > 0)
       ) {
-        e.preventDefault(); // Prevent default browser delete behavior
-        // Use functional updates to ensure you're working with the latest state
+        e.preventDefault();
         setNodes((nds) => nds.filter((n) => !selectedNodes.includes(n.id)));
         setEdges((eds) => eds.filter((e) => !selectedEdges.includes(e.id)));
         setSelectedNodes([]);
         setSelectedEdges([]);
       }
 
-      // Keyboard shortcuts
       if (e.ctrlKey || e.metaKey) {
-        // Ctrl for Windows/Linux, Meta (Command) for Mac
         switch (e.key) {
           case 'r':
-            e.preventDefault(); // Prevent browser refresh
+            e.preventDefault();
             addResizableRectangle('resizableRectangle');
             break;
           case 'g':
-            e.preventDefault(); // Prevent browser find
+            e.preventDefault();
             addResizableRectangle('styledRectangle');
             break;
         }
@@ -353,17 +333,16 @@ function FlowCanvasInner() {
                 ...n,
                 data: {
                   ...updatedNode.data,
-                  onEdit: handleEditNode, // Ensure onEdit is always correctly re-attached and stable
+                  onEdit: handleEditNode, // Maintain the stable handler
                 },
               }
             : n
         )
       );
-      // After updating, reset selectedNode and close modal
       setSelectedNode(null);
       setIsModalOpen(false);
     },
-    [setNodes, handleEditNode] // Depend on setNodes and the stable handleEditNode
+    [setNodes, handleEditNode]
   );
 
   const handleDeleteNode = useCallback(
@@ -394,7 +373,6 @@ function FlowCanvasInner() {
         onDrop={onDrop}
         onDragOver={(e) => e.preventDefault()}
       >
-        {/* Replace the old buttons with the new JamboardToolbar component */}
         <JamboardToolbar
           onExport={onExportFlow}
           onImport={onImportFlow}
@@ -413,7 +391,6 @@ function FlowCanvasInner() {
             nodes: selectedNodes = [],
             edges: selectedEdges = [],
           }) => {
-            // More robust selection change comparison
             const nextSelectedNodeIds = selectedNodes.map((n) => n.id).sort();
             const nextSelectedEdgeIds = selectedEdges.map((e) => e.id).sort();
 

@@ -15,9 +15,9 @@ export default function CustomNode({ data = {}, id = '1', selected = true }) {
     ) {
       return;
     }
-    if (data.onEdit) {
-      data.onEdit(id);
-    }
+    // if (data.onEdit) {
+    //   data.onEdit(id);
+    // }
   };
 
   return (
