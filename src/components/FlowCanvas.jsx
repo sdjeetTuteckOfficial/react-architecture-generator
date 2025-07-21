@@ -18,6 +18,7 @@ import {
 } from './TransparentRectangleNode';
 import EditModal from '../components/EditModal';
 import ChatInput from './ChatInput';
+import Toolbar from './Toolbar'; // Import the new Toolbar component
 import { fetchArchitectureJSON } from '../api/gemini';
 
 const nodeTypes = {
@@ -35,7 +36,7 @@ function FlowCanvasInner() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const { fitView, project, getViewport } = useReactFlow();
+  const { fitView, project, getViewport, toObject } = useReactFlow(); // Add toObject for export
 
   // Function to add a resizable transparent rectangle
   const addResizableRectangle = useCallback(
@@ -105,12 +106,14 @@ function FlowCanvasInner() {
         position: node.position || { x: 100, y: 100 },
         data: {
           ...node.data,
-          image: node.data.image
-            ? `/images/${node.data.image}` // ✅ this tells ReactFlow node to load from public/images/
-            : null,
-          onEdit: () => {
-            setSelectedNode(node);
-            setIsModalOpen(true);
+          image: node.data.image ? `/images/${node.data.image}` : null,
+          onEdit: (nodeId) => {
+            // Modified to receive nodeId from CustomNode
+            const nodeToEdit = nodes.find((n) => n.id === nodeId);
+            if (nodeToEdit) {
+              setSelectedNode(nodeToEdit);
+              setIsModalOpen(true);
+            }
           },
         },
         // Ensure regular nodes have higher z-index than rectangles
@@ -127,6 +130,8 @@ function FlowCanvasInner() {
       setTimeout(() => fitView({ padding: 0.2 }), 100);
     } catch (err) {
       console.error('Error loading architecture:', err);
+      // Optional: Show an error message to the user
+      alert('Failed to generate architecture. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -180,9 +185,13 @@ function FlowCanvasInner() {
         data: {
           label: `${type} node`,
           image: null,
-          onEdit: () => {
-            setSelectedNode(newNode);
-            setIsModalOpen(true);
+          onEdit: (nodeId) => {
+            // Pass nodeId to onEdit here too
+            const nodeToEdit = nodes.find((n) => n.id === nodeId);
+            if (nodeToEdit) {
+              setSelectedNode(nodeToEdit);
+              setIsModalOpen(true);
+            }
           },
         },
         zIndex: 1, // Regular nodes above rectangles
@@ -190,7 +199,76 @@ function FlowCanvasInner() {
 
       setNodes((nds) => [...nds, newNode]);
     },
-    [project, setNodes]
+    [project, setNodes, nodes] // Add 'nodes' to dependencies for onEdit
+  );
+
+  // Export Flow
+  const onExportFlow = useCallback(() => {
+    const flow = toObject();
+    const jsonString = JSON.stringify(flow, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'react-flow-architecture.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    alert('Flow exported successfully!');
+  }, [toObject]);
+
+  // Import Flow
+  const onImportFlow = useCallback(
+    (event) => {
+      const file = event.target.files[0];
+      if (!file) {
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const flow = JSON.parse(e.target.result);
+          if (flow.nodes && flow.edges) {
+            // Re-attach onEdit function
+            const importedNodes = flow.nodes.map((node) => ({
+              ...node,
+              data: {
+                ...node.data,
+                onEdit: (nodeId) => {
+                  // Make sure this is re-attached
+                  const nodeToEdit = flow.nodes.find((n) => n.id === nodeId);
+                  if (nodeToEdit) {
+                    setSelectedNode(nodeToEdit);
+                    setIsModalOpen(true);
+                  }
+                },
+                // Ensure image path is correct if loaded from local
+                image:
+                  node.data.image && !node.data.image.startsWith('/')
+                    ? `/images/${node.data.image.split('/').pop()}` // Correct path if it was 'image.png'
+                    : node.data.image,
+              },
+            }));
+
+            setNodes(importedNodes || []);
+            setEdges(flow.edges || []);
+            setTimeout(() => fitView({ padding: 0.2 }), 100);
+            alert('Flow imported successfully!');
+          } else {
+            alert('Invalid flow file structure.');
+          }
+        } catch (error) {
+          console.error('Error parsing flow file:', error);
+          alert('Failed to import flow. Invalid JSON file.');
+        } finally {
+          // Clear the file input after import attempt
+          event.target.value = null;
+        }
+      };
+      reader.readAsText(file);
+    },
+    [setNodes, setEdges, fitView]
   );
 
   // Update node count in styled rectangles when nodes change
@@ -198,21 +276,28 @@ function FlowCanvasInner() {
     setNodes((currentNodes) =>
       currentNodes.map((node) => {
         if (node.type === 'styledRectangle' && node.data.showCount) {
-          // Count overlapping nodes (simplified logic)
+          // Count overlapping nodes (simplified logic, may need refinement for exact overlap)
           const regularNodes = currentNodes.filter((n) => n.type === 'custom');
           const overlapping = regularNodes.filter((regNode) => {
+            const rectWidth = node.style?.width || 300;
+            const rectHeight = node.style?.height || 200;
             const rectBounds = {
               left: node.position.x,
-              right: node.position.x + (node.style?.width || 300),
+              right: node.position.x + rectWidth,
               top: node.position.y,
-              bottom: node.position.y + (node.style?.height || 200),
+              bottom: node.position.y + rectHeight,
             };
 
+            // Basic check if node center is within the rectangle's bounds
+            // For more accurate checking, you'd need node dimensions
+            const nodeCenterX = regNode.position.x + (regNode.width || 0) / 2;
+            const nodeCenterY = regNode.position.y + (regNode.height || 0) / 2;
+
             return (
-              regNode.position.x >= rectBounds.left - 50 &&
-              regNode.position.x <= rectBounds.right + 50 &&
-              regNode.position.y >= rectBounds.top - 50 &&
-              regNode.position.y <= rectBounds.bottom + 50
+              nodeCenterX > rectBounds.left &&
+              nodeCenterX < rectBounds.right &&
+              nodeCenterY > rectBounds.top &&
+              nodeCenterY < rectBounds.bottom
             );
           }).length;
 
@@ -226,11 +311,15 @@ function FlowCanvasInner() {
         return node;
       })
     );
-  }, [nodes.length, setNodes]);
+  }, [nodes.length, setNodes]); // Depend on nodes.length to trigger updates when nodes are added/removed
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Delete') {
+      if (
+        e.key === 'Delete' &&
+        (selectedNodes.length > 0 || selectedEdges.length > 0)
+      ) {
+        e.preventDefault(); // Prevent default browser delete behavior
         setNodes((nds) => nds.filter((n) => !selectedNodes.includes(n.id)));
         setEdges((eds) => eds.filter((e) => !selectedEdges.includes(e.id)));
         setSelectedNodes([]);
@@ -239,13 +328,14 @@ function FlowCanvasInner() {
 
       // Keyboard shortcuts
       if (e.ctrlKey || e.metaKey) {
+        // Ctrl for Windows/Linux, Meta (Command) for Mac
         switch (e.key) {
           case 'r':
-            e.preventDefault();
+            e.preventDefault(); // Prevent browser refresh
             addResizableRectangle('resizableRectangle');
             break;
           case 'g':
-            e.preventDefault();
+            e.preventDefault(); // Prevent browser find
             addResizableRectangle('styledRectangle');
             break;
         }
@@ -256,32 +346,44 @@ function FlowCanvasInner() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedNodes, selectedEdges, addResizableRectangle]);
 
-  const handleUpdateNode = (updatedNode) => {
-    setNodes((prev) =>
-      prev.map((n) =>
-        n.id === updatedNode.id
-          ? {
-              ...n,
-              data: {
-                ...updatedNode.data,
-                onEdit: () => {
-                  setSelectedNode(updatedNode);
-                  setIsModalOpen(true);
+  const handleUpdateNode = useCallback(
+    (updatedNode) => {
+      setNodes((prev) =>
+        prev.map((n) =>
+          n.id === updatedNode.id
+            ? {
+                ...n,
+                data: {
+                  ...updatedNode.data,
+                  // Ensure onEdit is always correctly re-attached
+                  onEdit: (nodeId) => {
+                    const nodeToEdit = prev.find((node) => node.id === nodeId);
+                    if (nodeToEdit) {
+                      setSelectedNode(nodeToEdit);
+                      setIsModalOpen(true);
+                    }
+                  },
                 },
-              },
-            }
-          : n
-      )
-    );
-    setIsModalOpen(false);
-  };
+              }
+            : n
+        )
+      );
+      setIsModalOpen(false);
+    },
+    [setNodes]
+  ); // Depend on setNodes
 
-  const handleDeleteNode = (id) => {
-    setNodes((prev) => prev.filter((n) => n.id !== id));
-    setEdges((prev) => prev.filter((e) => e.source !== id && e.target !== id));
-    setSelectedNode(null);
-    setIsModalOpen(false);
-  };
+  const handleDeleteNode = useCallback(
+    (id) => {
+      setNodes((prev) => prev.filter((n) => n.id !== id));
+      setEdges((prev) =>
+        prev.filter((e) => e.source !== id && e.target !== id)
+      );
+      setSelectedNode(null);
+      setIsModalOpen(false);
+    },
+    [setNodes, setEdges]
+  ); // Depend on setNodes, setEdges
 
   return (
     <>
@@ -299,23 +401,14 @@ function FlowCanvasInner() {
         onDrop={onDrop}
         onDragOver={(e) => e.preventDefault()}
       >
-        {/* Control buttons */}
-        <div className='absolute top-4 right-4 z-10 flex flex-col gap-2'>
-          <button
-            onClick={() => addResizableRectangle('resizableRectangle')}
-            className='px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors shadow-lg'
-            title='Add resizable rectangle (Ctrl+R)'
-          >
-            📦 Rectangle
-          </button>
-          <button
-            onClick={() => addResizableRectangle('styledRectangle')}
-            className='px-3 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600 transition-colors shadow-lg'
-            title='Add styled group (Ctrl+G)'
-          >
-            🎯 Group
-          </button>
-        </div>
+        {/* Replace the old buttons with the new Toolbar component */}
+        <Toolbar
+          onExport={onExportFlow}
+          onImport={onImportFlow}
+          onAddRectangle={() => addResizableRectangle('resizableRectangle')}
+          onAddGroup={() => addResizableRectangle('styledRectangle')}
+          isLoading={loading}
+        />
 
         <ReactFlow
           nodes={nodes}
@@ -323,25 +416,34 @@ function FlowCanvasInner() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
-          onSelectionChange={({ nodes = [], edges = [] }) => {
-            const nextSelectedNodeIds = nodes.map((n) => n.id);
-            const nextSelectedEdgeIds = edges.map((e) => e.id);
+          onSelectionChange={({
+            nodes: selectedNodes = [],
+            edges: selectedEdges = [],
+          }) => {
+            // Only update state if selection actually changed to avoid unnecessary re-renders
+            const nextSelectedNodeIds = selectedNodes.map((n) => n.id);
+            const nextSelectedEdgeIds = selectedEdges.map((e) => e.id);
 
-            setSelectedNodes((prev) =>
-              JSON.stringify(prev) !== JSON.stringify(nextSelectedNodeIds)
-                ? nextSelectedNodeIds
-                : prev
-            );
-            setSelectedEdges((prev) =>
-              JSON.stringify(prev) !== JSON.stringify(nextSelectedEdgeIds)
-                ? nextSelectedEdgeIds
-                : prev
-            );
+            setSelectedNodes((prev) => {
+              if (
+                JSON.stringify(prev) !== JSON.stringify(nextSelectedNodeIds)
+              ) {
+                return nextSelectedNodeIds;
+              }
+              return prev;
+            });
+            setSelectedEdges((prev) => {
+              if (
+                JSON.stringify(prev) !== JSON.stringify(nextSelectedEdgeIds)
+              ) {
+                return nextSelectedEdgeIds;
+              }
+              return prev;
+            });
           }}
           nodeTypes={nodeTypes}
           fitView
           className='bg-gray-50 w-full h-full'
-          // Important settings for proper layering
           elevateNodesOnSelect={false}
           selectNodesOnDrag={true}
           multiSelectionKeyCode='Shift'
