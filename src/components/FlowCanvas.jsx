@@ -314,21 +314,6 @@ function FlowCanvasInner() {
           </button>
         </div>
 
-        {/* Instructions */}
-        <div className='absolute top-4 left-4 z-10 bg-white/90 rounded-lg p-3 text-sm text-gray-600 shadow-lg max-w-xs'>
-          <div className='font-semibold mb-2'>Rectangle Controls:</div>
-          <div>• Select rectangle to resize with handles</div>
-          <div>• Rectangles stay behind other nodes</div>
-          <div>
-            • <kbd className='px-1 bg-gray-200 rounded'>Ctrl+R</kbd> Basic
-            rectangle
-          </div>
-          <div>
-            • <kbd className='px-1 bg-gray-200 rounded'>Ctrl+G</kbd> Styled
-            group
-          </div>
-        </div>
-
         <ReactFlow
           nodes={nodes}
           edges={edges}
