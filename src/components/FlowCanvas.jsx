@@ -105,6 +105,9 @@ function FlowCanvasInner() {
         position: node.position || { x: 100, y: 100 },
         data: {
           ...node.data,
+          image: node.data.image
+            ? `/images/${node.data.image}` // ✅ this tells ReactFlow node to load from public/images/
+            : null,
           onEdit: () => {
             setSelectedNode(node);
             setIsModalOpen(true);
