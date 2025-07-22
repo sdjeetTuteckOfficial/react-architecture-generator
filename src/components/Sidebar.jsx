@@ -1,19 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { AVAILABLE_IMAGES } from '../constants/images_constants';
-// Assuming AVAILABLE_IMAGES is an array of image filenames, e.g., ['image1.png', 'image2.jpg']
-// In a real application, this would likely come from an API call or dynamic file listing.
+import { AVAILABLE_IMAGES } from '../constants/images_constants'; // Ensure this path is correct
 
 export default function Sidebar() {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(''); // New state for search term
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const handleDragStart = (event, nodeType, imageSrc = null) => {
+  // Added imageName parameter to handleDragStart
+  const handleDragStart = (
+    event,
+    nodeType,
+    imageSrc = null,
+    imageName = null
+  ) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
-    // If it's an image node, also pass the image source
     if (imageSrc) {
       event.dataTransfer.setData('image/src', imageSrc);
+    }
+    // New: Pass the image name if available
+    if (imageName) {
+      event.dataTransfer.setData('image/name', imageName);
     }
     event.dataTransfer.effectAllowed = 'move';
   };
@@ -21,7 +28,6 @@ export default function Sidebar() {
   const loadImages = async () => {
     setLoading(true);
     // Simulate API call to get images from public/images
-    // In a real application, you might fetch these from a server endpoint
     setTimeout(() => {
       setImages(AVAILABLE_IMAGES); // Using the mock data
       setLoading(false);
@@ -55,7 +61,7 @@ export default function Sidebar() {
     <div className='w-64 bg-white border-r p-4 font-sans'>
       <h2 className='text-lg font-bold mb-4 text-gray-800'>Drag Nodes</h2>
 
-      {/* Default Node - your original code */}
+      {/* Default Node */}
       <div
         onDragStart={(e) => handleDragStart(e, 'default')}
         draggable
@@ -109,15 +115,18 @@ export default function Sidebar() {
               </div>
             ) : (
               <div className='grid grid-cols-3 gap-3 h-64 overflow-y-auto pr-2 custom-scrollbar'>
-                {' '}
-                {/* Added h-64, overflow-y-auto, and custom-scrollbar */}
                 {filteredImages.length > 0 ? (
                   filteredImages.map((imageName, index) => (
                     <div
                       key={index}
                       className='text-center cursor-grab active:cursor-grabbing'
                       onDragStart={(e) =>
-                        handleDragStart(e, 'imageNode', `/images/${imageName}`)
+                        handleDragStart(
+                          e,
+                          'imageNode',
+                          `/images/${imageName}`,
+                          getImageName(imageName) // Pass the image name here
+                        )
                       }
                       draggable
                     >
@@ -126,7 +135,7 @@ export default function Sidebar() {
                         <img
                           src={`/images/${imageName}`}
                           alt={getImageName(imageName)}
-                          className='w-full h-full object-contain rounded' // Changed object-cover to object-contain for better fit
+                          className='w-full h-full object-contain rounded'
                           onError={handleImageError}
                         />
 
@@ -176,7 +185,7 @@ export default function Sidebar() {
           </div>
         )}
       </div>
-      {/* Custom scrollbar style for better appearance */}
+      {/* Custom scrollbar style */}
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;

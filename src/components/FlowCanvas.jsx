@@ -125,7 +125,7 @@ function FlowCanvasInner() {
       event.preventDefault();
       const type = event.dataTransfer.getData('application/reactflow');
       const imageSrc = event.dataTransfer.getData('image/src');
-
+      const imageName = event.dataTransfer.getData('image/name');
       // Get the drop position
       const position = project({
         x: event.clientX - 250,
@@ -151,6 +151,7 @@ function FlowCanvasInner() {
 
         if (droppedOnNode) {
           // Replace the existing node's image
+          console.log('here calling');
           setNodes((nds) =>
             nds.map((node) =>
               node.id === droppedOnNode.id
@@ -159,7 +160,7 @@ function FlowCanvasInner() {
                     data: {
                       ...node.data,
                       image: imageSrc,
-                      label: node.data.label || `Image node`, // Keep existing label or set default
+                      label: imageName || 'Image Node', // Keep existing label or set default
                     },
                   }
                 : node
@@ -190,7 +191,7 @@ function FlowCanvasInner() {
       // If it's an image node, set the image source
       if (type === 'imageNode' && imageSrc) {
         newNode.data.image = imageSrc;
-        newNode.data.label = 'Image node';
+        newNode.data.label = imageName || 'Image node';
       }
 
       setNodes((nds) => [...nds, newNode]);
