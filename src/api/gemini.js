@@ -1,97 +1,139 @@
+// src/api/gemini.js
 import axios from 'axios';
+import {
+  AWS_AVAILABLE_IMAGES,
+  AZURE_AVAILABLE_IMAGES,
+  local_images,
+} from '../constants/images_constants'; // Assuming this path is correct
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// Define available image filenames stored in /public/images/
-export const AVAILABLE_IMAGES = [
-  'React.png',
-  'server.png',
-  'database.png',
-  'user.png',
-  'cloud.png',
-  'api.png',
-  'frontend.png',
-  'backend.png',
-  'loadbalancer.png',
-  'Amazon-Aurora.svg',
-  'Amazon-DocumentDB.svg',
-  'Amazon-ElastiCache.svg',
-  'Amazon-DynamoDB.svg',
-  'Amazon-RDS.svg',
-  'Amazon-EC2.svg',
-  'Amazon-S3.svg',
-  'AWS-Step-Functions.svg',
-  'AWS-Identity-and-Access-Management.svg',
-  'Amazon-Cognito.svg',
-  'AWS-Fargate.svg',
-  'AWS-Lambda.svg',
-  'Amazon-Simple-Email-Service.svg',
-  'Amazon-Simple-Notification-Service.svg',
-  'Amazon-Elastic-Load-Balancing.svg',
-  'Amazon-API-Gateway.svg',
-  'Amazon-CloudFront.svg',
+// Combine all images into a single array for architecture diagrams
+const allAvailableImages = [
+  ...AWS_AVAILABLE_IMAGES,
+  ...AZURE_AVAILABLE_IMAGES,
+  ...local_images,
 ];
 
-// Create a prompt dynamically including the image options
-const createPrompt = (userPrompt) => {
-  const imageList = AVAILABLE_IMAGES.map((img) => `- "${img}"`).join('\n');
-  //   return `You are a system that generates architecture diagrams compatible with React Flow, and your output must be a valid JSON object with the following structure:
+const imageList = allAvailableImages.map((img) => `- "${img}"`).join('\n');
 
-  // nodes: array of node objects. Each node includes:
+// Function to create prompts dynamically based on diagram type
+const createPrompt = (userPrompt, diagramType) => {
+  if (diagramType === 'architecture') {
+    return `
+You are an assistant that returns React Flow-compatible architecture diagrams in JSON.
 
-  // id: a unique identifier (string)
+The JSON must include:
+- nodes: array of objects with { id, data: { label, image (optional) }, position: { x, y } }
+- edges: array of objects with { id, source, target }
 
-  // data: object with:
+Use \`data.image\` field to assign an image (optional). Only use the following images:
 
-  // label: a human-readable name (string)
+${imageList}
 
-  // image (optional): a string from the allowed image list
+Do **not** include the user prompt itself as a node.
 
-  // position: object with { x, y } coordinates
+Return only valid JSON format, without markdown or code block formatting.
 
-  // edges: array of edge objects. Each edge includes:
+Now generate the architecture for:
+"${userPrompt}"
+`;
+  } else if (diagramType === 'db_diagram') {
+    return `
+You are an assistant that returns React Flow-compatible database schema diagrams in JSON.
 
-  // id: a unique identifier (string)
+The JSON must include:
+- nodes: array of objects, each representing a database table.
+- edges: array of objects, representing relationships between tables.
 
-  // source: the ID of the source node
+Each node (table) object must have the following structure:
+{
+  id: 'unique_table_id_lowercase_snake_case', // e.g., 'users', 'products'
+  data: {
+    label: 'Table Name', // e.g., 'Users', 'Products'
+    fields: [ // Array of column objects
+      {
+        name: 'column_name', // e.g., 'id', 'username', 'product_id'
+        type: 'SQL_TYPE',    // e.g., 'INT', 'VARCHAR(255)', 'TIMESTAMP', 'BOOLEAN', 'TEXT'
+        primaryKey: boolean, // true if it's a primary key
+        foreignKey: boolean, // true if it's a foreign key
+        references: 'referenced_table_id.referenced_column_name' // Required if foreignKey is true, e.g., 'users.id'
+      },
+      // ... more field objects
+    ]
+  },
+  position: { x: number, y: number } // Coordinates for the node
+}
 
-  // target: the ID of the target node
+Each edge (relationship) object must have the following structure:
+{
+  id: 'unique_edge_id', // e.g., 'edge-users-orders'
+  source: 'source_table_id',
+  target: 'target_table_id',
+  type: 'smoothstep', // Recommended for clean lines
+  animated: true,    // Recommended for visual clarity
+  markerEnd: { type: 'arrowclosed' } // Recommended for direction
+}
 
-  // Additional constraints:
+Ensure that foreign key relationships are correctly represented by both:
+1.  Setting \`foreignKey: true\` and \`references: 'table_id.column_name'\` in the field definition of the child table.
+2.  Creating an edge from the child table's ID to the parent table's ID.
 
-  // Use only the following predefined image values for data.image:
-  // ${imageList}
+Do **not** include the user prompt itself as a node.
+Return only valid JSON format, without markdown or code block formatting.
 
-  // Do not include the user's prompt as a node.
+Example:
+For a prompt like "users and their orders", generate:
+[
+  {
+    "id": "users",
+    "data": {
+      "label": "Users",
+      "fields": [
+        { "name": "id", "type": "INT", "primaryKey": true, "foreignKey": false },
+        { "name": "username", "type": "VARCHAR(50)", "primaryKey": false, "foreignKey": false, "unique": true },
+        { "name": "email", "type": "VARCHAR(100)", "primaryKey": false, "foreignKey": false }
+      ]
+    },
+    "position": { "x": 0, "y": 0 }
+  },
+  {
+    "id": "orders",
+    "data": {
+      "label": "Orders",
+      "fields": [
+        { "name": "id", "type": "INT", "primaryKey": true, "foreignKey": false },
+        { "name": "user_id", "type": "INT", "primaryKey": false, "foreignKey": true, "references": "users.id" },
+        { "name": "order_date", "type": "TIMESTAMP", "primaryKey": false, "foreignKey": false },
+        { "name": "total_amount", "type": "DECIMAL(10,2)", "primaryKey": false, "foreignKey": false }
+      ]
+    },
+    "position": { "x": 300, "y": 0 }
+  }
+]
+And edges for the example:
+[
+  {
+    "id": "edge-users-orders",
+    "source": "users",
+    "target": "orders",
+    "type": "smoothstep",
+    "animated": true,
+    "markerEnd": { "type": "arrowclosed" }
+  }
+]
 
-  // Output must be a valid JSON object, with no markdown or text explanations.
-
-  // Now generate a React Flow-compatible architecture diagram in JSON for this system description:
-  // "${userPrompt}"`;
-
-  return `
-  You are an assistant that returns React Flow-compatible architecture diagrams in JSON.
-
-  The JSON must include:
-  - nodes: array of objects with { id, data: { label, image (optional) }, position: { x, y } }
-  - edges: array of objects with { id, source, target }
-
-  Use \`data.image\` field to assign an image (optional). Only use the following images:
-
-  ${imageList}
-
-  Do **not** include the user prompt itself as a node.
-
-  Return only valid JSON format, without markdown or code block formatting.
-
-  Now generate the architecture for:
-  "${userPrompt}"
-  `;
+Now generate the database schema for:
+"${userPrompt}"
+`;
+  }
+  // Default to architecture if an unknown type is provided
+  return createPrompt(userPrompt, 'architecture');
 };
 
-// Function to call Gemini API and return parsed architecture JSON
-export const fetchArchitectureJSON = async (userPrompt) => {
-  const prompt = createPrompt(userPrompt);
+// Function to call Gemini API and return parsed diagram JSON
+export const fetchDiagramJSON = async (userPrompt, diagramType) => {
+  const prompt = createPrompt(userPrompt, diagramType);
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 

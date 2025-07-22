@@ -9,14 +9,17 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
+import { useSelector, useDispatch } from 'react-redux';
+import { setUserPrompt } from '../redux/diagramSlice';
+
 import EditModal from '../components/EditModal';
-import ChatInput from './ChatInput';
+import ChatInput from '../components/ChatInput';
 import JamboardToolbar from './Toolbar';
-import { fetchArchitectureJSON } from '../api/gemini';
+import { fetchDiagramJSON } from '../api/gemini';
 
 // Import constants and utilities
 import {
-  NODE_TYPES,
+  NODE_TYPES, // NODE_TYPES now includes 'custom' and 'dbTableNode'
   RECTANGLE_CONFIGS,
   KEYBOARD_SHORTCUTS,
 } from '../constants/flow_constants';
@@ -29,8 +32,10 @@ import {
   isWithinBounds,
 } from '../hooks/useFlowStates';
 
-// Main component
-function FlowCanvasInner() {
+// --- The entire CustomNodeWithDropZone component definition block has been REMOVED from here ---
+// It is now expected to be in src/components/CustomNode.jsx and imported via NODE_TYPES.
+
+function FlowCanvas() {
   const {
     nodes,
     setNodes,
@@ -52,7 +57,10 @@ function FlowCanvasInner() {
 
   const { fitView, project, getViewport, toObject } = useReactFlow();
 
-  // Event handlers
+  // Redux State and Dispatch
+  const diagramType = useSelector((state) => state.diagram.diagramType);
+  const dispatch = useDispatch(); // You have this here, but setUserPrompt isn't dispatched in this file directly
+
   const handleEditNode = useCallback(
     (nodeId) => {
       setNodes((currentNodes) => {
@@ -79,23 +87,37 @@ function FlowCanvasInner() {
     [setNodes, getViewport]
   );
 
-  const handlePromptSubmit = useCallback(
+  // This function is now passed as onSubmit to ChatInput
+  const handleGenerateDiagram = useCallback(
     async (prompt) => {
+      if (!prompt) {
+        alert('Please enter a prompt to generate a diagram.');
+        return;
+      }
+
       try {
         setLoading(true);
-        const data = await fetchArchitectureJSON(prompt);
+        const data = await fetchDiagramJSON(prompt, diagramType);
 
-        const newNodes = data.nodes.map((node) => ({
-          ...node,
-          type: node.type || 'custom',
-          position: node.position || { x: 100, y: 100 },
-          data: {
-            ...node.data,
-            image: processImagePath(node.data.image),
-            onEdit: handleEditNode,
-          },
-          zIndex: node.zIndex || 1,
-        }));
+        const newNodes = data.nodes.map((node) => {
+          let nodeType = 'custom'; // Default to 'custom' for architecture nodes with images or general nodes
+          let nodeData = { ...node.data, onEdit: handleEditNode };
+
+          if (diagramType === 'architecture') {
+            nodeType = node.data.image ? 'custom' : 'default'; // If no image, fallback to default React Flow node
+            nodeData.image = processImagePath(node.data.image);
+          } else if (diagramType === 'db_diagram') {
+            nodeType = 'dbTableNode'; // Explicitly use the DbTableNode for database diagrams
+          }
+
+          return {
+            ...node,
+            type: nodeType,
+            position: node.position || { x: 100, y: 100 },
+            data: nodeData,
+            zIndex: node.zIndex || 1,
+          };
+        });
 
         const nodeIds = new Set(newNodes.map((n) => n.id));
         const newEdges = data.edges
@@ -106,13 +128,13 @@ function FlowCanvasInner() {
         setEdges(newEdges);
         setTimeout(() => fitView({ padding: 0.2 }), 100);
       } catch (err) {
-        console.error('Error loading architecture:', err);
-        alert('Failed to generate architecture. Please try again.');
+        console.error('Error loading diagram:', err);
+        alert('Failed to generate diagram. Please try again.');
       } finally {
         setLoading(false);
       }
     },
-    [setLoading, handleEditNode, setNodes, setEdges, fitView]
+    [setLoading, handleEditNode, setNodes, setEdges, fitView, diagramType]
   );
 
   const onConnect = useCallback(
@@ -124,11 +146,47 @@ function FlowCanvasInner() {
     (event) => {
       event.preventDefault();
       const type = event.dataTransfer.getData('application/reactflow');
+      const imageSrc = event.dataTransfer.getData('image/src');
+      const imageName = event.dataTransfer.getData('image/name');
+
+      const elementBelow = document.elementFromPoint(
+        event.clientX,
+        event.clientY
+      );
+
+      const nodeElement = elementBelow?.closest('.react-flow__node');
+
+      // Logic for dropping an image onto an existing 'custom' node to replace its image
+      if (type === 'imageNode' && imageSrc && nodeElement) {
+        const nodeId = nodeElement.getAttribute('data-id');
+        const targetNode = nodes.find(
+          (node) => node.id === nodeId && node.type === 'custom'
+        );
+
+        if (targetNode) {
+          setNodes((nds) =>
+            nds.map((node) =>
+              node.id === nodeId
+                ? {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      image: imageSrc,
+                    },
+                  }
+                : node
+            )
+          );
+          return;
+        }
+      }
+
       const position = project({
-        x: event.clientX - 250,
-        y: event.clientY,
+        x: event.clientX - (event.target.getBoundingClientRect().left || 0),
+        y: event.clientY - (event.target.getBoundingClientRect().top || 0),
       });
 
+      // Logic for dropping a rectangle type
       if (['resizableRectangle', 'styledRectangle'].includes(type)) {
         const config = {
           ...RECTANGLE_CONFIGS[type],
@@ -143,10 +201,17 @@ function FlowCanvasInner() {
         return;
       }
 
+      // Logic for dropping a new custom node (e.g., image node from toolbar)
       const newNode = createCustomNode(position, type, handleEditNode);
+
+      if (type === 'imageNode' && imageSrc) {
+        newNode.data.image = imageSrc;
+        newNode.data.label = imageName || 'Image node';
+      }
+
       setNodes((nds) => [...nds, newNode]);
     },
-    [project, setNodes, handleEditNode]
+    [project, setNodes, handleEditNode, nodes]
   );
 
   const handleExportFlow = useCallback(() => {
@@ -229,14 +294,23 @@ function FlowCanvasInner() {
 
   const handleDeleteNode = useCallback(
     (id) => {
-      setNodes((prev) => prev.filter((n) => n.id !== id));
+      setNodes((prev) => prev.filter((n) => !n.selected));
       setEdges((prev) =>
-        prev.filter((e) => e.source !== id && e.target !== id)
+        prev.filter((e) => !e.selected && e.source !== id && e.target !== id)
       );
       setSelectedNode(null);
+      setSelectedNodes([]);
+      setSelectedEdges([]);
       setIsModalOpen(false);
     },
-    [setNodes, setEdges, setSelectedNode, setIsModalOpen]
+    [
+      setNodes,
+      setEdges,
+      setSelectedNode,
+      setSelectedNodes,
+      setSelectedEdges,
+      setIsModalOpen,
+    ]
   );
 
   const handleSelectionChange = useCallback(
@@ -267,7 +341,11 @@ function FlowCanvasInner() {
     if (node.type === 'resizableRectangle' || node.type === 'styledRectangle') {
       return node.data.borderColor || '#3b82f6';
     }
-    return '#1a192b';
+    // Set a distinct color for DB table nodes on the minimap
+    if (node.type === 'dbTableNode') {
+      return '#8b5cf6'; // A shade of purple, for example
+    }
+    return '#1a192b'; // Default color for other nodes (like 'custom' or 'default')
   }, []);
 
   // Effects
@@ -275,6 +353,10 @@ function FlowCanvasInner() {
     setNodes((currentNodes) =>
       currentNodes.map((node) => {
         if (node.type === 'styledRectangle' && node.data.showCount) {
+          // This logic currently counts 'custom' nodes.
+          // If you want to count 'dbTableNode's within styled rectangles as well,
+          // you'd adjust this filter:
+          // const regularNodes = currentNodes.filter((n) => n.type === 'custom' || n.type === 'dbTableNode');
           const regularNodes = currentNodes.filter((n) => n.type === 'custom');
           const rectSize = {
             width: node.style?.width || 300,
@@ -304,20 +386,15 @@ function FlowCanvasInner() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Delete selected items
       if (
         e.key === KEYBOARD_SHORTCUTS.DELETE &&
         (selectedNodes.length > 0 || selectedEdges.length > 0)
       ) {
         e.preventDefault();
-        setNodes((nds) => nds.filter((n) => !selectedNodes.includes(n.id)));
-        setEdges((eds) => eds.filter((e) => !selectedEdges.includes(e.id)));
-        setSelectedNodes([]);
-        setSelectedEdges([]);
+        handleDeleteNode(null);
         return;
       }
 
-      // Keyboard shortcuts with Ctrl/Cmd
       if (e.ctrlKey || e.metaKey) {
         switch (e.key) {
           case KEYBOARD_SHORTCUTS.ADD_RECTANGLE:
@@ -336,15 +413,7 @@ function FlowCanvasInner() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    selectedNodes,
-    selectedEdges,
-    addResizableRectangle,
-    setNodes,
-    setEdges,
-    setSelectedNodes,
-    setSelectedEdges,
-  ]);
+  }, [selectedNodes, selectedEdges, addResizableRectangle, handleDeleteNode]);
 
   return (
     <>
@@ -352,7 +421,9 @@ function FlowCanvasInner() {
         <div className='fixed inset-0 z-[1000] flex items-center justify-center bg-white bg-opacity-70'>
           <div className='w-12 h-12 rounded-full border-4 border-blue-500 border-t-transparent animate-spin' />
           <span className='ml-4 text-lg font-medium text-gray-700'>
-            Generating architecture...
+            {diagramType === 'architecture'
+              ? 'Generating architecture...'
+              : 'Generating DB diagram...'}
           </span>
         </div>
       )}
@@ -377,7 +448,7 @@ function FlowCanvasInner() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onSelectionChange={handleSelectionChange}
-          nodeTypes={NODE_TYPES}
+          nodeTypes={NODE_TYPES} // This is where React Flow gets your custom node types
           fitView
           className='bg-gray-50 w-full h-full'
           elevateNodesOnSelect={false}
@@ -403,15 +474,17 @@ function FlowCanvasInner() {
         />
       </div>
 
-      <ChatInput onSubmit={handlePromptSubmit} />
+      {/* Use the ChatInput component and pass handleGenerateDiagram as onSubmit */}
+      <ChatInput onSubmit={handleGenerateDiagram} />
     </>
   );
 }
 
-export default function FlowCanvas() {
+// Export the component wrapped in ReactFlowProvider
+export default function AppFlowCanvasWrapper() {
   return (
     <ReactFlowProvider>
-      <FlowCanvasInner />
+      <FlowCanvas />
     </ReactFlowProvider>
   );
 }
