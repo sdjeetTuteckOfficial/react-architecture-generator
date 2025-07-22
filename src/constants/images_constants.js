@@ -1,4 +1,4 @@
-// Auto-generated image list
+
 
 export const AWS_AVAILABLE_IMAGES = [
   "AWS-Activate.svg",
@@ -929,4 +929,5 @@ export const local_images = [
   "React.png",
   "server.png",
   "user.png",
+
 ];

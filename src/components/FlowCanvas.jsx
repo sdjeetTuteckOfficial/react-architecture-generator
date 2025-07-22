@@ -124,6 +124,126 @@ function FlowCanvasInner() {
     (event) => {
       event.preventDefault();
       const type = event.dataTransfer.getData('application/reactflow');
+      const imageSrc = event.dataTransfer.getData('image/src');
+      const imageName = event.dataTransfer.getData('image/name');
+      // Get the drop position
+      const position = project({
+        x: event.clientX - 250,
+        y: event.clientY,
+      });
+
+      // Check if we're dropping an image
+      if (type === 'imageNode' && imageSrc) {
+        // Find if there's an existing node at the drop position
+        const droppedOnNode = nodes.find((node) => {
+          if (node.type !== 'custom') return false;
+
+          const nodeWidth = node.width || 150; // Default width
+          const nodeHeight = node.height || 100; // Default height
+
+          return (
+            position.x >= node.position.x &&
+            position.x <= node.position.x + nodeWidth &&
+            position.y >= node.position.y &&
+            position.y <= node.position.y + nodeHeight
+          );
+        });
+
+        if (droppedOnNode) {
+          // Replace the existing node's image
+          console.log('here calling');
+          setNodes((nds) =>
+            nds.map((node) =>
+              node.id === droppedOnNode.id
+                ? {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      image: imageSrc,
+                      label: imageName || 'Image Node', // Keep existing label or set default
+                    },
+                  }
+                : node
+            )
+          );
+          return; // Exit early, don't create a new node
+        }
+      }
+
+      // Original logic for creating new nodes
+      if (['resizableRectangle', 'styledRectangle'].includes(type)) {
+        const config = {
+          ...RECTANGLE_CONFIGS[type],
+          ...(type === 'resizableRectangle'
+            ? { label: 'Dropped Area' }
+            : { title: 'Dropped Group', centerLabel: 'Group area' }),
+        };
+
+        const newNode = createRectangleNode(type, position, config);
+        newNode.style = { width: 250, height: 180, zIndex: -1 };
+        setNodes((nds) => [...nds, newNode]);
+        return;
+      }
+
+      // Create new custom node (including image nodes)
+      const newNode = createCustomNode(position, type, handleEditNode);
+
+      // If it's an image node, set the image source
+      if (type === 'imageNode' && imageSrc) {
+        newNode.data.image = imageSrc;
+        newNode.data.label = imageName || 'Image node';
+      }
+
+      setNodes((nds) => [...nds, newNode]);
+    },
+    [project, setNodes, handleEditNode, nodes]
+  );
+
+  // Alternative: More precise collision detection using DOM elements
+  const onDropWithDOMDetection = useCallback(
+    (event) => {
+      event.preventDefault();
+      const type = event.dataTransfer.getData('application/reactflow');
+      const imageSrc = event.dataTransfer.getData('image/src');
+
+      // Check if we're dropping an image
+      if (type === 'imageNode' && imageSrc) {
+        // Get the element under the mouse cursor
+        const elementBelow = document.elementFromPoint(
+          event.clientX,
+          event.clientY
+        );
+
+        // Find the closest node element
+        const nodeElement = elementBelow?.closest('[data-id]');
+
+        if (nodeElement) {
+          const nodeId = nodeElement.getAttribute('data-id');
+          const targetNode = nodes.find(
+            (node) => node.id === nodeId && node.type === 'custom'
+          );
+
+          if (targetNode) {
+            // Replace the existing node's image
+            setNodes((nds) =>
+              nds.map((node) =>
+                node.id === nodeId
+                  ? {
+                      ...node,
+                      data: {
+                        ...node.data,
+                        image: imageSrc,
+                      },
+                    }
+                  : node
+              )
+            );
+            return; // Exit early, don't create a new node
+          }
+        }
+      }
+
+      // Original logic for other cases...
       const position = project({
         x: event.clientX - 250,
         y: event.clientY,
@@ -144,10 +264,85 @@ function FlowCanvasInner() {
       }
 
       const newNode = createCustomNode(position, type, handleEditNode);
+
+      if (type === 'imageNode' && imageSrc) {
+        newNode.data.image = imageSrc;
+        newNode.data.label = 'Image node';
+      }
+
       setNodes((nds) => [...nds, newNode]);
     },
-    [project, setNodes, handleEditNode]
+    [project, setNodes, handleEditNode, nodes]
   );
+
+  // Enhanced Custom Node Component with drop zone highlighting
+  const CustomNodeWithDropZone = ({ data, selected }) => {
+    const [isDragOver, setIsDragOver] = useState(false);
+
+    const handleDragOver = (e) => {
+      e.preventDefault();
+      const type = e.dataTransfer.types.includes('application/reactflow');
+      const hasImage = e.dataTransfer.types.includes('image/src');
+
+      if (type && hasImage) {
+        setIsDragOver(true);
+      }
+    };
+
+    const handleDragLeave = () => {
+      setIsDragOver(false);
+    };
+
+    const handleDrop = (e) => {
+      e.preventDefault();
+      setIsDragOver(false);
+      // Let the parent onDrop handler deal with this
+    };
+
+    return (
+      <div
+        className={`px-4 py-2 shadow-md rounded-md bg-white border-2 ${
+          selected ? 'border-blue-500' : 'border-gray-200'
+        } ${isDragOver ? 'border-dashed border-blue-400 bg-blue-50' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {/* Image display */}
+        {data.image && (
+          <div className='mb-2'>
+            <img
+              src={data.image}
+              alt='Node'
+              className='w-16 h-16 object-cover rounded mx-auto'
+            />
+          </div>
+        )}
+
+        {/* Node label */}
+        <div className='text-center'>
+          <div className='text-xs font-medium'>{data.label}</div>
+        </div>
+
+        {/* Drop zone indicator */}
+        {isDragOver && (
+          <div className='absolute inset-0 flex items-center justify-center bg-blue-100 bg-opacity-80 rounded-md'>
+            <div className='text-blue-600 text-xs font-medium'>
+              Drop to replace image
+            </div>
+          </div>
+        )}
+
+        {/* Edit button */}
+        <button
+          onClick={() => data.onEdit && data.onEdit(data.id)}
+          className='absolute top-1 right-1 text-gray-400 hover:text-gray-600'
+        >
+          ⚙️
+        </button>
+      </div>
+    );
+  };
 
   const handleExportFlow = useCallback(() => {
     const flow = toObject();
