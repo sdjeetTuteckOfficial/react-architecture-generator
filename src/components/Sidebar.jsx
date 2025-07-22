@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AVAILABLE_IMAGES } from '../constants/images_constants'; // Ensure this path is correct
 
 export default function Sidebar() {
@@ -6,6 +7,7 @@ export default function Sidebar() {
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const navigate = useNavigate();
 
   // Added imageName parameter to handleDragStart
   const handleDragStart = (
@@ -57,10 +59,19 @@ export default function Sidebar() {
     getImageName(imageName).toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  return (
-    <div className='w-64 bg-white border-r p-4 font-sans'>
-      <h2 className='text-lg font-bold mb-4 text-gray-800'>Drag Nodes</h2>
+  // --- New: handleLogout function ---
+  const handleLogout = () => {
+    console.log('User logged out!');
+    localStorage.clear();
+    navigate('/login');
+  };
+  // --- End New ---
 
+  return (
+    <div className='w-64 bg-white border-r p-4 font-sans flex flex-col h-full'>
+      {' '}
+      {/* Added flex-col and h-full */}
+      <h2 className='text-lg font-bold mb-4 text-gray-800'>Drag Nodes</h2>
       {/* Default Node */}
       <div
         onDragStart={(e) => handleDragStart(e, 'default')}
@@ -69,9 +80,10 @@ export default function Sidebar() {
       >
         Default Node
       </div>
-
       {/* Images Dropdown */}
-      <div className='mb-2'>
+      <div className='mb-2 flex-grow'>
+        {' '}
+        {/* Added flex-grow to push logout button to bottom */}
         <button
           onClick={handleDropdownClick}
           className='w-full flex items-center justify-between text-left bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors shadow-sm'
@@ -93,7 +105,6 @@ export default function Sidebar() {
             />
           </svg>
         </button>
-
         {/* Images Grid - only visible when dropdown is open */}
         {isOpen && (
           <div className='mt-3 border border-gray-200 rounded-lg p-3 bg-gray-50 shadow-inner'>
@@ -185,6 +196,32 @@ export default function Sidebar() {
           </div>
         )}
       </div>
+      {/* --- New: Logout Button --- */}
+      <div className='mt-auto pt-4 border-t border-gray-200'>
+        {' '}
+        {/* Added mt-auto to push it to the bottom */}
+        <button
+          onClick={handleLogout}
+          className='w-full flex items-center justify-center bg-red-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-red-600 transition-colors'
+        >
+          <svg
+            className='w-5 h-5 mr-2'
+            fill='none'
+            stroke='currentColor'
+            viewBox='0 0 24 24'
+            xmlns='http://www.w3.org/2000/svg'
+          >
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              strokeWidth={2}
+              d='M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H5a3 3 0 01-3-3V7a3 3 0 013-3h5a3 3 0 013 3v1'
+            ></path>
+          </svg>
+          Logout
+        </button>
+      </div>
+      {/* --- End New --- */}
       {/* Custom scrollbar style */}
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar {
