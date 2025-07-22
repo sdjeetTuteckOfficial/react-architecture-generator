@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AVAILABLE_IMAGES } from '../constants/images_constants'; // Ensure this path is correct
+import {
+  AWS_AVAILABLE_IMAGES,
+  AZURE_AVAILABLE_IMAGES,
+  local_images,
+} from '../constants/images_constants'; // Ensure this path is correct
 
 export default function Sidebar() {
   const [images, setImages] = useState([]);
@@ -31,7 +35,11 @@ export default function Sidebar() {
     setLoading(true);
     // Simulate API call to get images from public/images
     setTimeout(() => {
-      setImages(AVAILABLE_IMAGES); // Using the mock data
+      setImages([
+        ...AWS_AVAILABLE_IMAGES,
+        ...AZURE_AVAILABLE_IMAGES,
+        ...local_images,
+      ]); // Using the mock data
       setLoading(false);
     }, 300);
   };

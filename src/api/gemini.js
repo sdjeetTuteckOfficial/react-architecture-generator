@@ -1,45 +1,22 @@
 import axios from 'axios';
-import { AVAILABLE_IMAGES } from '../constants/images_constants';
+import {
+  AWS_AVAILABLE_IMAGES,
+  AZURE_AVAILABLE_IMAGES,
+  local_images,
+} from '../constants/images_constants'; // Assuming this path is correct
+
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// Define available image filenames stored in /public/images/
-
-// Create a prompt dynamically including the image options
+// Create a prompt dynamically including all image options
 const createPrompt = (userPrompt) => {
-  const imageList = AVAILABLE_IMAGES.map((img) => `- "${img}"`).join('\n');
-  //   return `You are a system that generates architecture diagrams compatible with React Flow, and your output must be a valid JSON object with the following structure:
+  // Combine all images into a single array
+  const allAvailableImages = [
+    ...AWS_AVAILABLE_IMAGES,
+    ...AZURE_AVAILABLE_IMAGES,
+    ...local_images,
+  ];
 
-  // nodes: array of node objects. Each node includes:
-
-  // id: a unique identifier (string)
-
-  // data: object with:
-
-  // label: a human-readable name (string)
-
-  // image (optional): a string from the allowed image list
-
-  // position: object with { x, y } coordinates
-
-  // edges: array of edge objects. Each edge includes:
-
-  // id: a unique identifier (string)
-
-  // source: the ID of the source node
-
-  // target: the ID of the target node
-
-  // Additional constraints:
-
-  // Use only the following predefined image values for data.image:
-  // ${imageList}
-
-  // Do not include the user's prompt as a node.
-
-  // Output must be a valid JSON object, with no markdown or text explanations.
-
-  // Now generate a React Flow-compatible architecture diagram in JSON for this system description:
-  // "${userPrompt}"`;
+  const imageList = allAvailableImages.map((img) => `- "${img}"`).join('\n');
 
   return `
   You are an assistant that returns React Flow-compatible architecture diagrams in JSON.
