@@ -1,36 +1,8 @@
 import axios from 'axios';
-
+import { AVAILABLE_IMAGES } from '../constants/images_constants';
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 // Define available image filenames stored in /public/images/
-export const AVAILABLE_IMAGES = [
-  'React.png',
-  'server.png',
-  'database.png',
-  'user.png',
-  'cloud.png',
-  'api.png',
-  'frontend.png',
-  'backend.png',
-  'loadbalancer.png',
-  'Amazon-Aurora.svg',
-  'Amazon-DocumentDB.svg',
-  'Amazon-ElastiCache.svg',
-  'Amazon-DynamoDB.svg',
-  'Amazon-RDS.svg',
-  'Amazon-EC2.svg',
-  'Amazon-S3.svg',
-  'AWS-Step-Functions.svg',
-  'AWS-Identity-and-Access-Management.svg',
-  'Amazon-Cognito.svg',
-  'AWS-Fargate.svg',
-  'AWS-Lambda.svg',
-  'Amazon-Simple-Email-Service.svg',
-  'Amazon-Simple-Notification-Service.svg',
-  'Amazon-Elastic-Load-Balancing.svg',
-  'Amazon-API-Gateway.svg',
-  'Amazon-CloudFront.svg',
-];
 
 // Create a prompt dynamically including the image options
 const createPrompt = (userPrompt) => {
