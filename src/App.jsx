@@ -1,14 +1,34 @@
 import React from 'react';
-import Sidebar from './components/Sidebar';
-import FlowCanvas from './components/FlowCanvas';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+import Dashboard from './pages/FlowPage';
+import ProtectedRoute from './route/ProtectedRoute';
 
 export default function App() {
   return (
-    <div className='h-screen flex'>
-      <Sidebar />
-      <div className='flex-1 flex flex-col relative'>
-        <FlowCanvas />
+    <Router>
+      <div className="min-h-screen">
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/login" element={<Login />} />
+          
+          {/* Protected Routes */}
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Redirect root to dashboard */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          
+          {/* Catch all route - redirect to dashboard */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
       </div>
-    </div>
+    </Router>
   );
 }
