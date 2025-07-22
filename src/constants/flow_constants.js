@@ -3,12 +3,14 @@ import {
   ResizableTransparentRectangle,
   StyledResizableRectangle,
 } from '../components/TransparentRectangleNode';
+import DbTableNode from '../components/DbTableNode';
 
 // Constants
 const NODE_TYPES = {
   custom: CustomNode,
   resizableRectangle: ResizableTransparentRectangle,
   styledRectangle: StyledResizableRectangle,
+  dbTableNode: DbTableNode,
 };
 
 const RECTANGLE_CONFIGS = {
