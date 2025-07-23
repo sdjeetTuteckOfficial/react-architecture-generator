@@ -1,11 +1,13 @@
 // src/redux/store.js
-import { configureStore } from '@reduxjs/toolkit';
-import diagramReducer from './diagramSlice'; // We'll create this in the next step
+import { configureStore } from "@reduxjs/toolkit";
+import diagramReducer from "./diagramSlice";
+import chatReducer from "./ChatSlice";
 
 export const store = configureStore({
   reducer: {
     // This is where you combine all your reducers (slices)
     diagram: diagramReducer,
+    chat: chatReducer,
     // Add other reducers here if your app grows, e.g.,
     // auth: authReducer,
     // user: userReducer,

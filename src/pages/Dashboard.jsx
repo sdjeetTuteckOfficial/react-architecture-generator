@@ -44,7 +44,7 @@ function HomePage() {
             >
               {/* Button shine effect */}
               <div className='absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-12'></div>
-              <span className='relative z-10'>Start Documenting</span>
+              <span className='relative z-10' onClick={() => navigate('/chatbot')}>Start Documenting</span>
               <svg
                 className='ml-2 -mr-1 h-5 w-5 relative z-10'
                 xmlns='http://www.w3.org/2000/svg'
