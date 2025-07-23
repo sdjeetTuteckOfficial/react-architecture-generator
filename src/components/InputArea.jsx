@@ -9,6 +9,7 @@ const InputArea = () => {
   const [message, setMessage] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const { sendMessage } = useWebSocket('ws://localhost:3001'); // ✅ Your WebSocket server
+  console.log('hello');
 
   const handleSendMessage = () => {
     if (message.trim()) {
