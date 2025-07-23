@@ -5,12 +5,10 @@ import ReactFlow, {
   Background,
   addEdge,
   useReactFlow,
-  ReactFlowProvider,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
 import { useSelector, useDispatch } from 'react-redux';
-import { setUserPrompt } from '../redux/diagramSlice';
 import DbTableEditor from './DbTableEditor';
 import EditModal from '../components/EditModal';
 import ChatInput from '../components/ChatInput';
@@ -19,12 +17,11 @@ import { fetchDiagramJSON } from '../api/gemini';
 
 // Import constants and utilities
 import {
-  NODE_TYPES, // NODE_TYPES now includes 'custom' and 'dbTableNode'
+  NODE_TYPES,
   RECTANGLE_CONFIGS,
   KEYBOARD_SHORTCUTS,
 } from '../constants/flow_constants';
 import {
-  useFlowState,
   calculateViewportPosition,
   createRectangleNode,
   createCustomNode,
@@ -33,29 +30,25 @@ import {
   isWithinBounds,
 } from '../hooks/useFlowStates';
 
-// --- The entire CustomNodeWithDropZone component definition block has been REMOVED from here ---
-// It is now expected to be in src/components/CustomNode.jsx and imported via NODE_TYPES.
-
-function FlowCanvas() {
-  const {
-    nodes,
-    setNodes,
-    onNodesChange,
-    edges,
-    setEdges,
-    onEdgesChange,
-    selectedNode,
-    setSelectedNode,
-    selectedNodes,
-    setSelectedNodes,
-    selectedEdges,
-    setSelectedEdges,
-    isModalOpen,
-    setIsModalOpen,
-    loading,
-    setLoading,
-  } = useFlowState();
-
+// FlowCanvas now accepts all flow state and setters as props
+function FlowCanvas({
+  nodes,
+  setNodes,
+  onNodesChange,
+  edges,
+  setEdges,
+  onEdgesChange,
+  selectedNode,
+  setSelectedNode,
+  selectedNodes,
+  setSelectedNodes,
+  selectedEdges,
+  setSelectedEdges,
+  isModalOpen,
+  setIsModalOpen,
+  loading,
+  setLoading,
+}) {
   const { fitView, project, getViewport, toObject } = useReactFlow();
 
   // Redux State and Dispatch
@@ -88,16 +81,11 @@ function FlowCanvas() {
     [setNodes, getViewport]
   );
 
-  // NEW: Add custom node function
-
   const addCustomNode = useCallback(
     (initialLabel = 'New Custom Node', type = 'custom') => {
-      // <-- Add parameters here
       console.log('type', type);
       const viewport = getViewport();
       const position = calculateViewportPosition(viewport);
-
-      // Assuming createCustomNode creates a basic node structure
 
       let newNode = null;
       if (type === 'custom') {
@@ -106,20 +94,16 @@ function FlowCanvas() {
         newNode = createDbNode(position, type, handleEditNode);
       }
 
-      // Set default properties for the custom node,
-      // using the arguments if provided, otherwise fallback to defaults
       newNode.data = {
         ...newNode.data,
-        label: initialLabel, // Use the passed argument
-        // Add any other default properties your custom node needs
+        label: initialLabel,
       };
 
       setNodes((nds) => [...nds, newNode]);
     },
-    [setNodes, getViewport, handleEditNode] // Dependencies remain the same
+    [setNodes, getViewport, handleEditNode]
   );
 
-  // This function is now passed as onSubmit to ChatInput
   const handleGenerateDiagram = useCallback(
     async (prompt) => {
       if (!prompt) {
@@ -132,14 +116,14 @@ function FlowCanvas() {
         const data = await fetchDiagramJSON(prompt, diagramType);
 
         const newNodes = data.nodes.map((node) => {
-          let nodeType = 'custom'; // Default to 'custom' for architecture nodes with images or general nodes
+          let nodeType = 'custom';
           let nodeData = { ...node.data, onEdit: handleEditNode };
 
           if (diagramType === 'architecture') {
-            nodeType = node.data.image ? 'custom' : 'default'; // If no image, fallback to default React Flow node
+            nodeType = node.data.image ? 'custom' : 'default';
             nodeData.image = processImagePath(node.data.image);
           } else if (diagramType === 'db_diagram') {
-            nodeType = 'dbTableNode'; // Explicitly use the DbTableNode for database diagrams
+            nodeType = 'dbTableNode';
           }
 
           return {
@@ -188,7 +172,6 @@ function FlowCanvas() {
 
       const nodeElement = elementBelow?.closest('.react-flow__node');
 
-      // Logic for dropping an image onto an existing 'custom' node to replace its image
       if (type === 'imageNode' && imageSrc && nodeElement) {
         const nodeId = nodeElement.getAttribute('data-id');
         const targetNode = nodes.find(
@@ -218,7 +201,6 @@ function FlowCanvas() {
         y: event.clientY - (event.target.getBoundingClientRect().top || 0),
       });
 
-      // Logic for dropping a rectangle type
       if (['resizableRectangle', 'styledRectangle'].includes(type)) {
         const config = {
           ...RECTANGLE_CONFIGS[type],
@@ -233,7 +215,6 @@ function FlowCanvas() {
         return;
       }
 
-      // Logic for dropping a new custom node (e.g., image node from toolbar)
       const newNode = createCustomNode(position, type, handleEditNode);
 
       if (type === 'imageNode' && imageSrc) {
@@ -346,9 +327,9 @@ function FlowCanvas() {
   );
 
   const handleSelectionChange = useCallback(
-    ({ nodes: selectedNodes = [], edges: selectedEdges = [] }) => {
-      const nextSelectedNodeIds = selectedNodes.map((n) => n.id).sort();
-      const nextSelectedEdgeIds = selectedEdges.map((e) => e.id).sort();
+    ({ nodes: newSelectedNodes = [], edges: newSelectedEdges = [] }) => {
+      const nextSelectedNodeIds = newSelectedNodes.map((n) => n.id).sort();
+      const nextSelectedEdgeIds = newSelectedEdges.map((e) => e.id).sort();
 
       setSelectedNodes((prev) => {
         const prevSorted = [...prev].sort();
@@ -373,48 +354,52 @@ function FlowCanvas() {
     if (node.type === 'resizableRectangle' || node.type === 'styledRectangle') {
       return node.data.borderColor || '#3b82f6';
     }
-    // Set a distinct color for DB table nodes on the minimap
     if (node.type === 'dbTableNode') {
-      return '#8b5cf6'; // A shade of purple, for example
+      return '#8b5cf6';
     }
-    return '#1a192b'; // Default color for other nodes (like 'custom' or 'default')
+    return '#1a192b';
   }, []);
 
-  // Effects
+  // FIX FOR "MAXIMUM UPDATE DEPTH EXCEEDED" ERROR
   useEffect(() => {
-    setNodes((currentNodes) =>
-      currentNodes.map((node) => {
-        if (node.type === 'styledRectangle' && node.data.showCount) {
-          // This logic currently counts 'custom' nodes.
-          // If you want to count 'dbTableNode's within styled rectangles as well,
-          // you'd adjust this filter:
-          // const regularNodes = currentNodes.filter((n) => n.type === 'custom' || n.type === 'dbTableNode');
-          const regularNodes = currentNodes.filter((n) => n.type === 'custom');
-          const rectSize = {
-            width: node.style?.width || 300,
-            height: node.style?.height || 200,
+    let updatedAnyNode = false;
+    const nextNodes = nodes.map((node) => {
+      if (node.type === 'styledRectangle' && node.data.showCount) {
+        // Filter regular nodes for intersection check
+        const regularNodes = nodes.filter(
+          (n) => n.type === 'custom' || n.type === 'dbTableNode'
+        );
+        const rectSize = {
+          width: node.style?.width || 300,
+          height: node.style?.height || 200,
+        };
+
+        const overlappingCount = regularNodes.filter((regNode) =>
+          isWithinBounds(
+            regNode.position,
+            { width: regNode.width || 0, height: regNode.height || 0 },
+            node.position,
+            rectSize
+          )
+        ).length;
+
+        // Only create a new node object (and trigger an update) if the count has actually changed
+        if (overlappingCount !== node.data.nodeCount) {
+          updatedAnyNode = true;
+          return {
+            ...node,
+            data: { ...node.data, nodeCount: overlappingCount },
           };
-
-          const overlappingCount = regularNodes.filter((regNode) =>
-            isWithinBounds(
-              regNode.position,
-              { width: regNode.width || 0, height: regNode.height || 0 },
-              node.position,
-              rectSize
-            )
-          ).length;
-
-          if (overlappingCount !== node.data.nodeCount) {
-            return {
-              ...node,
-              data: { ...node.data, nodeCount: overlappingCount },
-            };
-          }
         }
-        return node;
-      })
-    );
-  }, [nodes.length, setNodes]);
+      }
+      return node; // Return the node as is if no update needed
+    });
+
+    // Only call setNodes if at least one node's data (nodeCount) was actually modified
+    if (updatedAnyNode) {
+      setNodes(nextNodes);
+    }
+  }, [nodes, setNodes]); // Keep nodes and setNodes in dependencies
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -437,7 +422,6 @@ function FlowCanvas() {
             e.preventDefault();
             addResizableRectangle('styledRectangle');
             break;
-          // NEW: Add keyboard shortcut for custom node (optional)
           case 'n': // Ctrl/Cmd + N for new custom node
             e.preventDefault();
             addCustomNode();
@@ -481,7 +465,7 @@ function FlowCanvas() {
           onImport={handleImportFlow}
           onAddRectangle={() => addResizableRectangle('resizableRectangle')}
           onAddGroup={() => addResizableRectangle('styledRectangle')}
-          onAddCustomNode={addCustomNode} // NEW: Pass the custom node handler
+          onAddCustomNode={addCustomNode}
           isLoading={loading}
         />
 
@@ -492,7 +476,7 @@ function FlowCanvas() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onSelectionChange={handleSelectionChange}
-          nodeTypes={NODE_TYPES} // This is where React Flow gets your custom node types
+          nodeTypes={NODE_TYPES}
           fitView
           className='bg-gray-50 w-full h-full'
           elevateNodesOnSelect={false}
@@ -525,27 +509,12 @@ function FlowCanvas() {
             onDelete={handleDeleteNode}
           />
         )}
-
-        {/* <EditModal
-          isOpen={isModalOpen}
-          node={selectedNode}
-          onClose={() => setIsModalOpen(false)}
-          onUpdate={handleUpdateNode}
-          onDelete={handleDeleteNode}
-        /> */}
       </div>
 
-      {/* Use the ChatInput component and pass handleGenerateDiagram as onSubmit */}
       <ChatInput onSubmit={handleGenerateDiagram} />
     </>
   );
 }
 
-// Export the component wrapped in ReactFlowProvider
-export default function AppFlowCanvasWrapper() {
-  return (
-    <ReactFlowProvider>
-      <FlowCanvas />
-    </ReactFlowProvider>
-  );
-}
+// Export the component directly, not wrapped in ReactFlowProvider here
+export default FlowCanvas;
