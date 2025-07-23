@@ -237,7 +237,6 @@
 //     );
 // }
 
-
 // pages/Chatbot.jsx
 import React from 'react';
 import AppBar from '../components/AppBar';
@@ -246,30 +245,30 @@ import MainChatArea from '../components/MainChatArea';
 import InputArea from '../components/InputArea';
 
 const Chatbot = () => {
-    return (
-        <div className="flex flex-col h-screen bg-gray-50">
-            {/* App Bar */}
-            <AppBar />
+  return (
+    <div className='flex flex-col h-screen bg-gray-50'>
+      {/* App Bar */}
+      <AppBar />
 
-            <div className="flex flex-1 overflow-hidden">
-                {/* Sidebar */}
-                <ChatUi_SideBar />
+      <div className='flex flex-1 overflow-hidden'>
+        {/* Sidebar */}
+        <ChatUi_SideBar />
 
-                {/* Main Chat Area + Input */}
-                <div className="flex-1 flex flex-col">
-                    {/* Scrollable Chat Area */}
-                    <div className="flex-1 overflow-y-auto">
-                        <MainChatArea />
-                    </div>
+        {/* Main Chat Area + Input */}
+        <div className='flex-1 flex flex-col'>
+          {/* Scrollable Chat Area */}
+          <div className='flex-1 overflow-y-auto'>
+            <MainChatArea />
+          </div>
 
-                    {/* Fixed Input Area */}
-                    <div className="border-t border-gray-200 bg-white">
-                        <InputArea />
-                    </div>
-                </div>
-            </div>
+          {/* Fixed Input Area */}
+          <div className='border-t border-gray-200 bg-white'>
+            <InputArea />
+          </div>
         </div>
-    );
+      </div>
+    </div>
+  );
 };
 
 export default Chatbot;
