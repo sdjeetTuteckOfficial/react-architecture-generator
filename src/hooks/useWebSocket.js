@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
-import { useDispatch } from "react-redux";
-import { addMessage } from "../redux/ChatSlice";
+import { useEffect, useRef } from 'react';
+import { useDispatch } from 'react-redux';
+import { addMessage } from '../redux/chatSlice';
 
 const useWebSocket = (url) => {
   const ws = useRef(null);
@@ -10,7 +10,7 @@ const useWebSocket = (url) => {
     ws.current = new WebSocket(url);
 
     ws.current.onopen = () => {
-      console.log("WebSocket connected");
+      console.log('WebSocket connected');
     };
 
     ws.current.onmessage = (event) => {
@@ -19,17 +19,17 @@ const useWebSocket = (url) => {
         addMessage({
           text: data.text,
           isBot: true,
-          subtitle: data.subtitle || "",
+          subtitle: data.subtitle || '',
         })
       );
     };
 
     ws.current.onerror = (err) => {
-      console.error("WebSocket error:", err);
+      console.error('WebSocket error:', err);
     };
 
     ws.current.onclose = () => {
-      console.log("WebSocket disconnected");
+      console.log('WebSocket disconnected');
     };
 
     return () => {
