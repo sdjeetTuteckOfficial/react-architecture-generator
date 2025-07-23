@@ -87,6 +87,23 @@ function FlowCanvas() {
     [setNodes, getViewport]
   );
 
+  // NEW: Add custom node function
+  const addCustomNode = useCallback(() => {
+    const viewport = getViewport();
+    const position = calculateViewportPosition(viewport);
+
+    const newNode = createCustomNode(position, 'custom', handleEditNode);
+
+    // Set default properties for the custom node
+    newNode.data = {
+      ...newNode.data,
+      label: 'New Custom Node',
+      // Add any other default properties your custom node needs
+    };
+
+    setNodes((nds) => [...nds, newNode]);
+  }, [setNodes, getViewport, handleEditNode]);
+
   // This function is now passed as onSubmit to ChatInput
   const handleGenerateDiagram = useCallback(
     async (prompt) => {
@@ -405,6 +422,11 @@ function FlowCanvas() {
             e.preventDefault();
             addResizableRectangle('styledRectangle');
             break;
+          // NEW: Add keyboard shortcut for custom node (optional)
+          case 'n': // Ctrl/Cmd + N for new custom node
+            e.preventDefault();
+            addCustomNode();
+            break;
           default:
             break;
         }
@@ -413,7 +435,13 @@ function FlowCanvas() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodes, selectedEdges, addResizableRectangle, handleDeleteNode]);
+  }, [
+    selectedNodes,
+    selectedEdges,
+    addResizableRectangle,
+    handleDeleteNode,
+    addCustomNode,
+  ]);
 
   return (
     <>
@@ -438,6 +466,7 @@ function FlowCanvas() {
           onImport={handleImportFlow}
           onAddRectangle={() => addResizableRectangle('resizableRectangle')}
           onAddGroup={() => addResizableRectangle('styledRectangle')}
+          onAddCustomNode={addCustomNode} // NEW: Pass the custom node handler
           isLoading={loading}
         />
 

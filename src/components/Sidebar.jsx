@@ -144,7 +144,8 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Default Node (always available) */}
+      {/* REMOVED: Default Node (previously here) */}
+      {/*
       <div
         onDragStart={(e) => handleDragStart(e, 'default')}
         draggable
@@ -152,6 +153,7 @@ export default function Sidebar() {
       >
         Default Node
       </div>
+      */}
 
       {/* Images Dropdown (only for architecture diagrams) */}
       {diagramType === 'architecture' && (
@@ -276,7 +278,7 @@ export default function Sidebar() {
             fill='none'
             stroke='currentColor'
             viewBox='0 0 24 24'
-            xmlns='[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)'
+            xmlns='http://www.w3.org/2000/svg'
           >
             <path
               strokeLinecap='round'

@@ -1,11 +1,12 @@
 import React from 'react';
-import { Download, Upload, PlusSquare, Group, Camera } from 'lucide-react'; // Import Camera icon
+import { Download, Upload, PlusSquare, Group, Square } from 'lucide-react'; // Import Square icon for Custom Node
 
 export default function JamboardToolbar({
   onExport,
   onImport,
   onAddRectangle,
   onAddGroup,
+  onAddCustomNode, // <--- Updated prop name to be more descriptive
   isLoading = false,
 }) {
   // Define the tools and actions for the toolbar
@@ -17,6 +18,12 @@ export default function JamboardToolbar({
       onClick: onAddRectangle,
     },
     { id: 'group', icon: Group, label: 'Group', onClick: onAddGroup },
+    {
+      id: 'custom-node', // <--- Updated id to match the functionality
+      icon: Square, // Using Square icon for a custom node
+      label: 'Custom Node', // <--- Updated label to "Custom Node"
+      onClick: onAddCustomNode, // <--- Updated to use the new prop name
+    },
   ];
 
   const actions = [
@@ -65,7 +72,7 @@ export default function JamboardToolbar({
   return (
     <div
       className='absolute top-4 left-4 z-10 flex flex-col items-center gap-1
-                    bg-white rounded-xl shadow-lg border border-gray-200 p-2 h-fit'
+                   bg-white rounded-xl shadow-lg border border-gray-200 p-2 h-fit'
     >
       {/* Tools Section */}
       <div className='flex flex-col gap-1 w-full'>
