@@ -87,12 +87,14 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
     };
 
     onUpdate(updatedNode);
+    onClose(); // Close the modal after saving
   };
 
   // Handle delete
   const handleDelete = () => {
     if (window.confirm('Are you sure you want to delete this table?')) {
       onDelete(node.id);
+      onClose(); // Close the modal after deleting
     }
   };
 
@@ -101,61 +103,62 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
   }
 
   return (
-    <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50'>
-      <div className='bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden'>
+    <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm'>
+      <div className='bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden mx-4'>
         {/* Header */}
-        <div className='flex items-center justify-between p-6 border-b'>
-          <h2 className='text-xl font-semibold text-gray-900'>
+        <div className='px-5 py-4 border-b border-gray-100 relative'>
+          <h2 className='text-lg font-semibold text-gray-800 pr-8'>
             Edit Database Table
           </h2>
           <button
             onClick={onClose}
-            className='text-gray-400 hover:text-gray-600 transition-colors'
+            className='absolute top-4 right-4 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all'
+            title='Close'
           >
-            <X size={24} />
+            <X size={16} />
           </button>
         </div>
 
         {/* Content */}
-        <div className='p-6 overflow-y-auto max-h-[calc(90vh-140px)]'>
+        <div className='p-5 overflow-y-auto max-h-[calc(90vh-140px)]'>
           {/* Table Name */}
-          <div className='mb-6'>
-            <label className='block text-sm font-medium text-gray-700 mb-2'>
+          <div className='mb-4'>
+            <label className='block text-xs font-medium text-gray-600 mb-1'>
               Table Name
             </label>
             <input
               type='text'
               value={tableName}
               onChange={(e) => setTableName(e.target.value)}
-              className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+              className='w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all'
               placeholder='Enter table name'
             />
           </div>
 
           {/* Fields Section */}
           <div className='mb-6'>
-            <div className='flex items-center justify-between mb-4'>
-              <h3 className='text-lg font-medium text-gray-900'>Fields</h3>
+            <div className='flex items-center justify-between mb-3'>
+              <h3 className='text-md font-medium text-gray-800'>Fields</h3>
               <button
                 onClick={addField}
-                className='flex items-center px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors'
+                className='flex items-center px-3 py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm'
               >
-                <Plus size={16} className='mr-1' />
+                <Plus size={14} className='mr-1' />
                 Add Field
               </button>
             </div>
 
             {/* Fields List */}
-            <div className='space-y-4'>
-              {fields.map((field, index) => (
+            <div className='space-y-3'>
+              {fields.map((field) => (
                 <div
                   key={field.id}
-                  className='p-4 border border-gray-200 rounded-lg'
+                  className='p-4 border border-gray-100 rounded-lg bg-gray-50'
                 >
-                  <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+                  <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
                     {/* Field Name */}
                     <div>
-                      <label className='block text-sm font-medium text-gray-700 mb-1'>
+                      <label className='block text-xs font-medium text-gray-600 mb-1'>
                         Field Name
                       </label>
                       <input
@@ -164,14 +167,14 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
                         onChange={(e) =>
                           updateField(field.id, { name: e.target.value })
                         }
-                        className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                        className='w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all'
                         placeholder='field_name'
                       />
                     </div>
 
                     {/* Field Type */}
                     <div>
-                      <label className='block text-sm font-medium text-gray-700 mb-1'>
+                      <label className='block text-xs font-medium text-gray-600 mb-1'>
                         Data Type
                       </label>
                       <select
@@ -179,7 +182,7 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
                         onChange={(e) =>
                           updateField(field.id, { type: e.target.value })
                         }
-                        className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                        className='w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all'
                       >
                         {DB_FIELD_TYPES.map((type) => (
                           <option key={type} value={type}>
@@ -191,7 +194,7 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
 
                     {/* Length/Size */}
                     <div>
-                      <label className='block text-sm font-medium text-gray-700 mb-1'>
+                      <label className='block text-xs font-medium text-gray-600 mb-1'>
                         Length (optional)
                       </label>
                       <input
@@ -200,15 +203,15 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
                         onChange={(e) =>
                           updateField(field.id, { length: e.target.value })
                         }
-                        className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                        className='w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all'
                         placeholder='255'
                       />
                     </div>
                   </div>
 
                   {/* Field Options */}
-                  <div className='flex flex-wrap items-center gap-4 mt-4'>
-                    <label className='flex items-center'>
+                  <div className='flex flex-wrap items-center gap-x-4 gap-y-2 mt-3'>
+                    <label className='flex items-center text-sm text-gray-700'>
                       <input
                         type='checkbox'
                         checked={field.primaryKey}
@@ -217,13 +220,13 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
                             primaryKey: e.target.checked,
                           })
                         }
-                        className='mr-2'
+                        className='mr-1 accent-blue-500'
                       />
-                      <Key size={16} className='mr-1 text-yellow-600' />
-                      <span className='text-sm'>Primary Key</span>
+                      <Key size={14} className='mr-1 text-yellow-600' />
+                      Primary Key
                     </label>
 
-                    <label className='flex items-center'>
+                    <label className='flex items-center text-sm text-gray-700'>
                       <input
                         type='checkbox'
                         checked={field.foreignKey}
@@ -232,41 +235,41 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
                             foreignKey: e.target.checked,
                           })
                         }
-                        className='mr-2'
+                        className='mr-1 accent-blue-500'
                       />
-                      <Link size={16} className='mr-1 text-green-600' />
-                      <span className='text-sm'>Foreign Key</span>
+                      <Link size={14} className='mr-1 text-green-600' />
+                      Foreign Key
                     </label>
 
-                    <label className='flex items-center'>
+                    <label className='flex items-center text-sm text-gray-700'>
                       <input
                         type='checkbox'
                         checked={field.unique}
                         onChange={(e) =>
                           updateField(field.id, { unique: e.target.checked })
                         }
-                        className='mr-2'
+                        className='mr-1 accent-blue-500'
                       />
-                      <Check size={16} className='mr-1 text-blue-600' />
-                      <span className='text-sm'>Unique</span>
+                      <Check size={14} className='mr-1 text-blue-600' />
+                      Unique
                     </label>
 
-                    <label className='flex items-center'>
+                    <label className='flex items-center text-sm text-gray-700'>
                       <input
                         type='checkbox'
                         checked={field.nullable}
                         onChange={(e) =>
                           updateField(field.id, { nullable: e.target.checked })
                         }
-                        className='mr-2'
+                        className='mr-1 accent-blue-500'
                       />
-                      <span className='text-sm'>Nullable</span>
+                      Nullable
                     </label>
 
                     {/* Delete Field Button */}
                     <button
                       onClick={() => deleteField(field.id)}
-                      className='ml-auto p-2 text-red-500 hover:text-red-700 transition-colors'
+                      className='ml-auto p-1 text-red-500 hover:text-red-600 transition-colors rounded-full hover:bg-red-50'
                       title='Delete field'
                     >
                       <Trash2 size={16} />
@@ -275,7 +278,7 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
 
                   {/* Default Value */}
                   <div className='mt-3'>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                    <label className='block text-xs font-medium text-gray-600 mb-1'>
                       Default Value (optional)
                     </label>
                     <input
@@ -284,7 +287,7 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
                       onChange={(e) =>
                         updateField(field.id, { defaultValue: e.target.value })
                       }
-                      className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                      className='w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all'
                       placeholder="NULL, 0, 'default', etc."
                     />
                   </div>
@@ -292,7 +295,7 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
               ))}
 
               {fields.length === 0 && (
-                <div className='text-center py-8 text-gray-500'>
+                <div className='text-center py-6 text-gray-500 text-sm'>
                   <p>No fields defined. Click "Add Field" to get started.</p>
                 </div>
               )}
@@ -301,26 +304,32 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
         </div>
 
         {/* Footer */}
-        <div className='flex items-center justify-between p-6 border-t bg-gray-50'>
-          <button
-            onClick={handleDelete}
-            className='px-4 py-2 text-red-600 hover:text-red-800 transition-colors'
-          >
-            Delete Table
-          </button>
-          <div className='flex space-x-3'>
+        <div className='px-5 py-3 border-t border-gray-100 bg-gray-50 rounded-b-xl'>
+          <div className='flex justify-between items-center'>
+            {/* Delete Button */}
             <button
-              onClick={onClose}
-              className='px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors'
+              onClick={handleDelete}
+              className='px-3 py-1.5 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm'
             >
-              Cancel
+              Delete Table
             </button>
-            <button
-              onClick={handleSave}
-              className='px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors'
-            >
-              Save Changes
-            </button>
+
+            {/* Action Buttons */}
+            <div className='flex gap-2'>
+              <button
+                onClick={onClose}
+                className='px-3 py-1.5 text-xs bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200'
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className='px-3 py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed'
+                disabled={!tableName.trim()}
+              >
+                Save Changes
+              </button>
+            </div>
           </div>
         </div>
       </div>
