@@ -1,7 +1,7 @@
 // src/redux/store.js
 import { configureStore } from '@reduxjs/toolkit';
 import diagramReducer from './diagramSlice';
-import chatReducer from './chatSlice';
+import chatReducer from './webChatSlice';
 
 export const store = configureStore({
   reducer: {

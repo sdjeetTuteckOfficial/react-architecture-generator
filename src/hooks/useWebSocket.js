@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
-import { addMessage } from '../redux/chatSlice';
+import { addMessage } from '../redux/webChatSlice';
 
 const useWebSocket = (url) => {
   const ws = useRef(null);

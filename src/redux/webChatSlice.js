@@ -1,24 +1,24 @@
-// redux/chatSlice.js
-import { createSlice } from "@reduxjs/toolkit";
+// redux/webChatSlice.js
+import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
-  selectedAgent: "BRD", // Default agent
+  selectedAgent: 'BRD', // Default agent
   messages: [
     {
       id: 1,
-      text: "Hi, what can I help with? V-3",
+      text: 'Hi, what can I help with? V-3',
       isBot: true,
-      subtitle: "Let me know how I can assist you today",
+      subtitle: 'Let me know how I can assist you today',
       timestamp: new Date().toISOString(),
-      agent: "BRD",
+      agent: 'BRD',
     },
   ],
   isLoading: false,
   currentThread: null,
 };
 
-const chatSlice = createSlice({
-  name: "chat",
+const webChatSlice = createSlice({
+  name: 'chat',
   initialState,
   reducers: {
     setSelectedAgent: (state, action) => {
@@ -27,7 +27,7 @@ const chatSlice = createSlice({
     },
 
     addMessage: (state, action) => {
-      console.log("Redux: Adding message", action.payload);
+      console.log('Redux: Adding message', action.payload);
       const newMessage = {
         id: Date.now() + Math.random(), // Ensure unique ID
         text: action.payload.text,
@@ -59,9 +59,9 @@ export const {
   clearMessages,
   setLoading,
   setCurrentThread,
-} = chatSlice.actions;
+} = webChatSlice.actions;
 
-export default chatSlice.reducer;
+export default webChatSlice.reducer;
 
 // Selectors for easy access
 export const selectSelectedAgent = (state) => state.chat.selectedAgent;

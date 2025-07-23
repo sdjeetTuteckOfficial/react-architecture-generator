@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { ChevronDown } from 'lucide-react';
-import { setSelectedAgent } from '../redux/chatSlice';
+import { setSelectedAgent } from '../redux/webChatSlice';
 
 const AppBar = () => {
   const dispatch = useDispatch();

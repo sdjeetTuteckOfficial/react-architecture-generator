@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Send } from 'lucide-react';
 import { useDispatch } from 'react-redux';
-import { addMessage } from '../redux/chatSlice';
+import { addMessage } from '../redux/webChatSlice';
 import useWebSocket from '../hooks/useWebSocket';
 
 const InputArea = () => {
