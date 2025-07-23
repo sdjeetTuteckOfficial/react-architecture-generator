@@ -263,7 +263,7 @@ const Chatbot = () => {
 
           {/* Fixed Input Area */}
           <div className='border-t border-gray-200 bg-white'>
-            {/* <InputArea /> */}
+            <InputArea />
           </div>
         </div>
       </div>
