@@ -11,7 +11,7 @@ import 'reactflow/dist/style.css';
 
 import { useSelector, useDispatch } from 'react-redux';
 import { setUserPrompt } from '../redux/diagramSlice';
-
+import DbTableEditor from './DbTableEditor';
 import EditModal from '../components/EditModal';
 import ChatInput from '../components/ChatInput';
 import JamboardToolbar from './Toolbar';
@@ -464,14 +464,31 @@ function FlowCanvas() {
           <Controls />
           <Background />
         </ReactFlow>
+        {selectedNode?.type === 'dbTableNode' ? (
+          <DbTableEditor
+            isOpen={isModalOpen}
+            node={selectedNode}
+            onClose={() => setIsModalOpen(false)}
+            onUpdate={handleUpdateNode}
+            onDelete={handleDeleteNode}
+          />
+        ) : (
+          <EditModal
+            isOpen={isModalOpen}
+            node={selectedNode}
+            onClose={() => setIsModalOpen(false)}
+            onUpdate={handleUpdateNode}
+            onDelete={handleDeleteNode}
+          />
+        )}
 
-        <EditModal
+        {/* <EditModal
           isOpen={isModalOpen}
           node={selectedNode}
           onClose={() => setIsModalOpen(false)}
           onUpdate={handleUpdateNode}
           onDelete={handleDeleteNode}
-        />
+        /> */}
       </div>
 
       {/* Use the ChatInput component and pass handleGenerateDiagram as onSubmit */}
