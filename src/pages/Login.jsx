@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, User } from 'lucide-react';
+import gunevoLogo from '/public/images/gunevo.svg';
 // Note: useNavigate is commented out as it requires react-router-dom,
 // which is not typically available in a standalone Canvas environment.
 // If this component is part of a larger application with routing, uncomment it.
@@ -70,7 +71,7 @@ const Login = () => {
               <div className='absolute inset-2 bg-white dark:bg-gray-900 rounded-xl flex items-center justify-center'>
                 <div className='relative'>
                   <User
-                    className='h-8 w-8 text-blue-600 animate-bounce'
+                    className='h-6 w-6 text-blue-600 animate-bounce'
                     style={{ animationDuration: '2s' }}
                   />
                   {/* Orbiting particles */}
@@ -95,10 +96,13 @@ const Login = () => {
                 </div>
               </div>
             </div>
-
-            <h1 className='text-2xl font-bold text-gray-900 dark:text-white mb-2 animate-fade-in'>
-              Gunevo
-            </h1>
+            <div className='mb-2 text-center'>
+              <img
+                src={gunevoLogo}
+                alt='Gunevo Logo'
+                className='w-48 mx-auto'
+              />
+            </div>
             <p
               className='text-gray-500 dark:text-gray-400 animate-fade-in'
               style={{ animationDelay: '0.2s' }}

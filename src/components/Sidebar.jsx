@@ -8,6 +8,9 @@ import {
   local_images,
 } from '../constants/images_constants'; // Ensure this path is correct
 
+// Import the gunevo.svg image
+import gunevoLogo from '/public/images/gunevo.svg';
+
 export default function Sidebar() {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -89,7 +92,10 @@ export default function Sidebar() {
 
   return (
     <div className='w-64 bg-white border-r p-4 font-sans flex flex-col h-full'>
-      <h2 className='text-lg font-bold mb-4 text-gray-800'>Drag Nodes</h2>
+      {/* Replaced the h2 with the image */}
+      <div className='mb-4 text-center'>
+        <img src={gunevoLogo} alt='Gunevo Logo' className='w-48 mx-auto' />
+      </div>
 
       {/* Diagram Type Dropdown */}
       <div className='mb-4 relative'>
@@ -143,17 +149,6 @@ export default function Sidebar() {
           </div>
         )}
       </div>
-
-      {/* REMOVED: Default Node (previously here) */}
-      {/*
-      <div
-        onDragStart={(e) => handleDragStart(e, 'default')}
-        draggable
-        className='cursor-grab active:cursor-grabbing bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700 transition-colors mb-4 text-center'
-      >
-        Default Node
-      </div>
-      */}
 
       {/* Images Dropdown (only for architecture diagrams) */}
       {diagramType === 'architecture' && (
