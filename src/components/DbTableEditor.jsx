@@ -25,11 +25,27 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
   const [tableName, setTableName] = useState('');
   const [fields, setFields] = useState([]);
 
+  // Helper function to sort fields for display/saving
+  const sortFieldsForDisplay = (fieldsArray) => {
+    return [...fieldsArray].sort((a, b) => {
+      // Primary keys come first
+      if (a.primaryKey && !b.primaryKey) return -1;
+      if (!a.primaryKey && b.primaryKey) return 1;
+
+      // Then foreign keys (if not primary key)
+      if (a.foreignKey && !b.foreignKey) return -1;
+      if (!a.foreignKey && b.foreignKey) return 1;
+
+      // Otherwise, sort alphabetically by name for consistency
+      return a.name.localeCompare(b.name);
+    });
+  };
+
   // Initialize form data when node changes
+  // Apply the display/save sorting here
   useEffect(() => {
     if (node && node.type === 'dbTableNode') {
       setTableName(node.data.label || '');
-      // Ensure each field has a unique ID if it doesn't already have one
       const fieldsWithIds = (node.data.fields || []).map((field, index) => ({
         ...field,
         id:
@@ -38,11 +54,12 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
             .toString(36)
             .substr(2, 9)}`,
       }));
-      setFields(fieldsWithIds);
+      setFields(sortFieldsForDisplay(fieldsWithIds)); // Apply sort on load
     }
   }, [node]);
 
   // Add a new field
+  // This function should ONLY add to the top, without immediate re-sorting
   const addField = () => {
     const newField = {
       id: `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -55,10 +72,11 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
       defaultValue: '',
       length: '',
     };
-    setFields((prev) => [...prev, newField]);
+    setFields((prev) => [newField, ...prev]); // New field always at top
   };
 
   // Update a field
+  // Keep the current order when just updating properties
   const updateField = (fieldId, updates) => {
     setFields((prev) =>
       prev.map((field) => {
@@ -77,12 +95,14 @@ const DbTableEditor = ({ isOpen, node, onClose, onUpdate, onDelete }) => {
 
   // Handle save
   const handleSave = () => {
+    const sortedFieldsForSave = sortFieldsForDisplay(fields); // Sort fields before saving
+
     const updatedNode = {
       ...node,
       data: {
         ...node.data,
         label: tableName,
-        fields: fields,
+        fields: sortedFieldsForSave, // Save the sorted fields
       },
     };
 
