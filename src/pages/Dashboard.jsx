@@ -39,12 +39,17 @@ function HomePage() {
           </p>
           <div className='mt-6 text-center'>
             <a
-              href='#'
+              href=''
               className='inline-flex items-center px-5 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300 group relative overflow-hidden'
             >
               {/* Button shine effect */}
               <div className='absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-12'></div>
-              <span className='relative z-10' onClick={() => navigate('/chatbot')}>Start Documenting</span>
+              <span
+                className='relative z-10'
+                onClick={() => navigate('/chatbot')}
+              >
+                Start Documenting
+              </span>
               <svg
                 className='ml-2 -mr-1 h-5 w-5 relative z-10'
                 xmlns='http://www.w3.org/2000/svg'
