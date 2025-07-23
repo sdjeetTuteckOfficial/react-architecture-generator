@@ -71,6 +71,17 @@ export const createCustomNode = (position, type, onEdit) => ({
   zIndex: 1,
 });
 
+export const createDbNode = (position, type, onEdit) => ({
+  id: createNodeId(),
+  type: 'dbTableNode',
+  position,
+  data: {
+    label: `${type} node`,
+    onEdit,
+  },
+  zIndex: 1,
+});
+
 export const processImagePath = (imagePath) => {
   if (!imagePath) return null;
   return imagePath.startsWith('/') ? imagePath : `/images/${imagePath}`;

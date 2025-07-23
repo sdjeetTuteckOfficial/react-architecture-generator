@@ -1,16 +1,26 @@
 import React from 'react';
-import { Download, Upload, PlusSquare, Group, Square } from 'lucide-react'; // Import Square icon for Custom Node
+import {
+  Download,
+  Upload,
+  PlusSquare,
+  Group,
+  Square,
+  Table,
+} from 'lucide-react'; // Import Table icon
+import { useSelector } from 'react-redux';
 
 export default function JamboardToolbar({
   onExport,
   onImport,
   onAddRectangle,
   onAddGroup,
-  onAddCustomNode, // <--- Updated prop name to be more descriptive
+  onAddCustomNode,
+  onAddDbTable, // New prop for adding DB Table node
   isLoading = false,
 }) {
-  // Define the tools and actions for the toolbar
-  const tools = [
+  const diagramType = useSelector((state) => state.diagram.diagramType);
+  // Define the common tools
+  const commonTools = [
     {
       id: 'rectangle',
       icon: PlusSquare,
@@ -18,13 +28,35 @@ export default function JamboardToolbar({
       onClick: onAddRectangle,
     },
     { id: 'group', icon: Group, label: 'Group', onClick: onAddGroup },
+  ];
+
+  // Define tools specific to 'architecture' diagram
+  const architectureTools = [
     {
-      id: 'custom-node', // <--- Updated id to match the functionality
-      icon: Square, // Using Square icon for a custom node
-      label: 'Custom Node', // <--- Updated label to "Custom Node"
-      onClick: onAddCustomNode, // <--- Updated to use the new prop name
+      id: 'custom-node',
+      icon: Square,
+      label: 'Custom Node',
+      onClick: () => onAddCustomNode(('New custom Node', 'custom')),
     },
   ];
+
+  // Define tools specific to 'db_diagram'
+  const dbDiagramTools = [
+    {
+      id: 'db-table',
+      icon: Table, // Using Table icon for DB Table node
+      label: 'DB Table',
+      onClick: () => onAddCustomNode('New db Node', 'dbTableNode'), // Call the new handler for DB Table
+    },
+  ];
+
+  // Dynamically determine which tools to display based on diagramType
+  const currentTools =
+    diagramType === 'architecture'
+      ? [...commonTools, ...architectureTools]
+      : diagramType === 'db_diagram'
+      ? [...commonTools, ...dbDiagramTools]
+      : commonTools; // Default to common tools if no specific type
 
   const actions = [
     { id: 'export', icon: Download, label: 'Export JSON', onClick: onExport },
@@ -60,9 +92,9 @@ export default function JamboardToolbar({
       {/* Tooltip */}
       <div
         className='absolute left-12 top-1/2 transform -translate-y-1/2
-                   bg-gray-900 text-white text-xs px-2 py-1 rounded
-                   opacity-0 group-hover:opacity-100 transition-opacity duration-200
-                   pointer-events-none whitespace-nowrap z-[60]'
+                    bg-gray-900 text-white text-xs px-2 py-1 rounded
+                    opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                    pointer-events-none whitespace-nowrap z-[60]'
       >
         {tool.label}
       </div>
@@ -72,11 +104,11 @@ export default function JamboardToolbar({
   return (
     <div
       className='absolute top-4 left-4 z-10 flex flex-col items-center gap-1
-                   bg-white rounded-xl shadow-lg border border-gray-200 p-2 h-fit'
+                    bg-white rounded-xl shadow-lg border border-gray-200 p-2 h-fit'
     >
       {/* Tools Section */}
       <div className='flex flex-col gap-1 w-full'>
-        {tools.map((tool) => (
+        {currentTools.map((tool) => (
           <ToolButton key={tool.id} tool={tool} />
         ))}
       </div>
@@ -113,9 +145,9 @@ export default function JamboardToolbar({
               {/* Tooltip for import */}
               <div
                 className='absolute left-12 top-1/2 transform -translate-y-1/2
-                           bg-gray-900 text-white text-xs px-2 py-1 rounded
-                           opacity-0 group-hover:opacity-100 transition-opacity duration-200
-                           pointer-events-none whitespace-nowrap z-[60]'
+                            bg-gray-900 text-white text-xs px-2 py-1 rounded
+                            opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                            pointer-events-none whitespace-nowrap z-[60]'
               >
                 {tool.label}
               </div>

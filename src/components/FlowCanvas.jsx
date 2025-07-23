@@ -28,6 +28,7 @@ import {
   calculateViewportPosition,
   createRectangleNode,
   createCustomNode,
+  createDbNode,
   processImagePath,
   isWithinBounds,
 } from '../hooks/useFlowStates';
@@ -88,21 +89,35 @@ function FlowCanvas() {
   );
 
   // NEW: Add custom node function
-  const addCustomNode = useCallback(() => {
-    const viewport = getViewport();
-    const position = calculateViewportPosition(viewport);
 
-    const newNode = createCustomNode(position, 'custom', handleEditNode);
+  const addCustomNode = useCallback(
+    (initialLabel = 'New Custom Node', type = 'custom') => {
+      // <-- Add parameters here
+      console.log('type', type);
+      const viewport = getViewport();
+      const position = calculateViewportPosition(viewport);
 
-    // Set default properties for the custom node
-    newNode.data = {
-      ...newNode.data,
-      label: 'New Custom Node',
-      // Add any other default properties your custom node needs
-    };
+      // Assuming createCustomNode creates a basic node structure
 
-    setNodes((nds) => [...nds, newNode]);
-  }, [setNodes, getViewport, handleEditNode]);
+      let newNode = null;
+      if (type === 'custom') {
+        newNode = createCustomNode(position, type, handleEditNode);
+      } else {
+        newNode = createDbNode(position, type, handleEditNode);
+      }
+
+      // Set default properties for the custom node,
+      // using the arguments if provided, otherwise fallback to defaults
+      newNode.data = {
+        ...newNode.data,
+        label: initialLabel, // Use the passed argument
+        // Add any other default properties your custom node needs
+      };
+
+      setNodes((nds) => [...nds, newNode]);
+    },
+    [setNodes, getViewport, handleEditNode] // Dependencies remain the same
+  );
 
   // This function is now passed as onSubmit to ChatInput
   const handleGenerateDiagram = useCallback(
