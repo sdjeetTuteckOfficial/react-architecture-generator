@@ -11,18 +11,30 @@ import {
 // Import the gunevo.svg image
 import gunevoLogo from '/public/images/gunevo.svg';
 
-export default function Sidebar() {
+export default function Sidebar({ nodes, edges }) {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [isImagesDropdownOpen, setIsImagesDropdownOpen] = useState(false); // Renamed for clarity
+  const [isImagesDropdownOpen, setIsImagesDropdownOpen] = useState(false);
   const [isDiagramTypeDropdownOpen, setIsDiagramTypeDropdownOpen] =
-    useState(false); // New state for diagram type dropdown
+    useState(false);
+  const [isDatabaseDropdownOpen, setIsDatabaseDropdownOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
-  // Get current diagram type from Redux store
+  // Get current diagram type and nodes/edges from Redux store
   const diagramType = useSelector((state) => state.diagram.diagramType);
   const dispatch = useDispatch();
+
+  // Database options
+  const DATABASE_OPTIONS = [
+    { id: 'mysql', name: 'MySQL', icon: '🐬' },
+    { id: 'postgresql', name: 'PostgreSQL', icon: '🐘' },
+    { id: 'sqlite', name: 'SQLite', icon: '🗃️' },
+    { id: 'oracle', name: 'Oracle', icon: '🔮' },
+    { id: 'sqlserver', name: 'SQL Server', icon: '🏢' },
+    // MongoDB has been removed as per the request
+  ];
 
   const handleDragStart = (
     event,
@@ -53,7 +65,6 @@ export default function Sidebar() {
   };
 
   const handleImagesDropdownClick = () => {
-    // Renamed handler
     setIsImagesDropdownOpen(!isImagesDropdownOpen);
     if (!isImagesDropdownOpen && images.length === 0) {
       loadImages();
@@ -61,14 +72,112 @@ export default function Sidebar() {
   };
 
   const handleDiagramTypeDropdownClick = () => {
-    // New handler
     setIsDiagramTypeDropdownOpen(!isDiagramTypeDropdownOpen);
   };
 
+  const handleDatabaseDropdownClick = () => {
+    setIsDatabaseDropdownOpen(!isDatabaseDropdownOpen);
+  };
+
   const handleSelectDiagramType = (type) => {
-    // New handler
-    dispatch(setDiagramType(type)); // Dispatch action to update Redux store
-    setIsDiagramTypeDropdownOpen(false); // Close dropdown after selection
+    dispatch(setDiagramType(type));
+    setIsDiagramTypeDropdownOpen(false);
+  };
+
+  const generateSQLWithGemini = async (databaseType, diagramData) => {
+    // In a real application, you would load this from an environment variable or secure configuration.
+    // For this example, we'll keep it as an empty string, as per instructions for Canvas.
+    const GEMINI_API_KEY = '';
+
+    try {
+      const prompt = `
+        Generate SQL DDL (Data Definition Language) statements for ${databaseType} database based on the following diagram structure:
+        
+        Nodes: ${JSON.stringify(diagramData.nodes, null, 2)}
+        Edges: ${JSON.stringify(diagramData.edges, null, 2)}
+        
+        Please create:
+        1. CREATE TABLE statements for each entity
+        2. Primary and foreign key constraints
+        3. Appropriate data types for ${databaseType}
+        4. Index suggestions where appropriate
+        5. Comments explaining the structure
+        
+        Format the output as clean, executable SQL statements.
+      `;
+
+      const payload = { contents: [{ parts: [{ text: prompt }] }] };
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.candidates[0]?.content?.parts[0]?.text || 'No SQL generated';
+    } catch (error) {
+      console.error('Error generating SQL:', error);
+      throw error;
+    }
+  };
+
+  const downloadTextFile = (content, filename) => {
+    const element = document.createElement('a');
+    const file = new Blob([content], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = filename;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const handleDatabaseExport = async (databaseType) => {
+    if (nodes.length === 0) {
+      // Show a custom message box instead of alert
+      showCustomMessageBox(
+        'No diagram data found.',
+        'Please create a database diagram first.',
+        'warning'
+      );
+      return;
+    }
+
+    setIsExporting(true);
+    setIsDatabaseDropdownOpen(false);
+
+    try {
+      const diagramData = { nodes, edges };
+      const sqlContent = await generateSQLWithGemini(databaseType, diagramData);
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `${databaseType}_schema_export_${timestamp}.sql`;
+
+      downloadTextFile(sqlContent, filename);
+
+      // Show success message
+      showCustomMessageBox(
+        'SQL Export Successful!',
+        `SQL file generated successfully for ${databaseType}!`,
+        'success'
+      );
+    } catch (error) {
+      console.error('Export failed:', error);
+      showCustomMessageBox(
+        'Export Failed',
+        'Failed to generate SQL file. Please check your API key and try again.',
+        'error'
+      );
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const getImageName = (filename) => {
@@ -77,7 +186,11 @@ export default function Sidebar() {
 
   const handleImageError = (e) => {
     e.target.style.display = 'none';
-    e.target.nextSibling.style.display = 'flex';
+    // Ensure the fallback div becomes fully opaque on error
+    if (e.target.nextSibling) {
+      e.target.nextSibling.style.opacity = '1';
+      e.target.nextSibling.style.display = 'flex'; // Ensure it's flex if it wasn't already
+    }
   };
 
   const filteredImages = images.filter((imageName) =>
@@ -90,9 +203,62 @@ export default function Sidebar() {
     navigate('/login');
   };
 
+  // Custom message box component
+  const CustomMessageBox = ({ message, title, type, onClose }) => {
+    let bgColor, borderColor, textColor;
+    switch (type) {
+      case 'success':
+        bgColor = 'bg-green-100';
+        borderColor = 'border-green-400';
+        textColor = 'text-green-700';
+        break;
+      case 'error':
+        bgColor = 'bg-red-100';
+        borderColor = 'border-red-400';
+        textColor = 'text-red-700';
+        break;
+      case 'warning':
+        bgColor = 'bg-yellow-100';
+        borderColor = 'border-yellow-400';
+        textColor = 'text-yellow-700';
+        break;
+      default:
+        bgColor = 'bg-blue-100';
+        borderColor = 'border-blue-400';
+        textColor = 'text-blue-700';
+    }
+
+    return (
+      <div className='fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50'>
+        <div
+          className={`rounded-lg shadow-xl p-6 max-w-sm w-full ${bgColor} border ${borderColor}`}
+        >
+          <h3 className={`text-lg font-semibold mb-3 ${textColor}`}>{title}</h3>
+          <p className={`text-sm mb-4 ${textColor}`}>{message}</p>
+          <button
+            onClick={onClose}
+            className='w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors'
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const [messageBox, setMessageBox] = useState(null);
+
+  const showCustomMessageBox = (title, message, type) => {
+    setMessageBox({ title, message, type });
+  };
+
+  const closeCustomMessageBox = () => {
+    setMessageBox(null);
+  };
+
   return (
     <div className='w-64 bg-white border-r p-4 font-sans flex flex-col h-full'>
-      {/* Replaced the h2 with the image */}
+      {/* Logo */}
       <div className='mb-4 text-center'>
         <img src={gunevoLogo} alt='Gunevo Logo' className='w-48 mx-auto' />
       </div>
@@ -197,7 +363,7 @@ export default function Sidebar() {
                     filteredImages.map((imageName, index) => (
                       <div
                         key={index}
-                        className='text-center cursor-grab active:cursor-grabbing'
+                        className='text-center cursor-grab active:cursor-grabbing group' // Added group class
                         onDragStart={(e) =>
                           handleDragStart(
                             e,
@@ -208,14 +374,17 @@ export default function Sidebar() {
                         }
                         draggable
                       >
-                        <div className='aspect-square bg-white rounded-lg border border-gray-300 p-1 flex flex-col items-center justify-center relative overflow-hidden shadow-sm hover:shadow-md transition-shadow'>
+                        <div className='aspect-square bg-white rounded-lg border border-gray-300 p-1 flex flex-col items-center justify-center relative overflow-hidden shadow-sm hover:shadow-md transition-shadow group-hover:border-blue-400 group-hover:shadow-lg'>
+                          {' '}
+                          {/* Enhanced hover styles */}
                           <img
                             src={`/images/${imageName}`}
                             alt={getImageName(imageName)}
                             className='w-full h-full object-contain rounded'
                             onError={handleImageError}
                           />
-                          <div className='absolute inset-0 hidden w-full h-full items-center justify-center bg-gray-100 rounded-lg'>
+                          {/* Fallback div now subtly visible on hover, fully on error */}
+                          <div className='absolute inset-0 flex w-full h-full items-center justify-center bg-gray-100 rounded-lg opacity-0 group-hover:opacity-50 transition-opacity'>
                             <svg
                               className='w-6 h-6 text-gray-400'
                               fill='none'
@@ -232,7 +401,9 @@ export default function Sidebar() {
                           </div>
                         </div>
                         <div className='mt-1'>
-                          <span className='text-xs text-gray-600 truncate block'>
+                          <span className='text-xs text-gray-600 truncate block group-hover:text-blue-700'>
+                            {' '}
+                            {/* Text color change on hover */}
                             {getImageName(imageName)}
                           </span>
                         </div>
@@ -262,7 +433,88 @@ export default function Sidebar() {
         </div>
       )}
 
-      {/* --- Logout Button --- */}
+      {/* Database Export Dropdown (only for DB diagrams) */}
+      {diagramType === 'db_diagram' && (
+        <div className='mb-2 flex-grow'>
+          <button
+            onClick={handleDatabaseDropdownClick}
+            disabled={isExporting}
+            className='w-full flex items-center justify-between text-left bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors shadow-sm'
+          >
+            <span className='text-base font-medium text-gray-700'>
+              {isExporting ? 'Generating SQL...' : 'Export Database Schema'}
+            </span>
+            {isExporting ? (
+              <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white'></div>
+            ) : (
+              <svg
+                className={`w-5 h-5 transition-transform ${
+                  isDatabaseDropdownOpen ? 'rotate-180' : ''
+                }`}
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M19 9l-7 7-7-7'
+                />
+              </svg>
+            )}
+          </button>
+          {isDatabaseDropdownOpen && !isExporting && (
+            <div className='mt-3 border border-gray-200 rounded-lg p-3 bg-gray-50 shadow-inner animate-fade-in'>
+              <div className='text-sm font-semibold text-gray-800 mb-2'>
+                {' '}
+                {/* Updated styling for the label */}
+                Select Database Type:
+              </div>
+              <div className='grid grid-cols-3 gap-2 h-28 overflow-y-auto custom-scrollbar p-1'>
+                {' '}
+                {/* Changed to grid, fixed height, scrollable */}
+                {DATABASE_OPTIONS.map((db) => (
+                  <button
+                    key={db.id}
+                    onClick={() => handleDatabaseExport(db.id)}
+                    className='flex flex-col items-center justify-center p-2 bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 ease-in-out group transform hover:scale-105 shadow-sm aspect-square' // Centered content, removed w-full, added aspect-square
+                    title={db.name} // Added title for tooltip on hover
+                  >
+                    <span className='text-2xl'>{db.icon}</span>{' '}
+                    {/* Larger icon */}
+                    {/* Removed db.name span and SVG download icon */}
+                  </button>
+                ))}
+              </div>
+              {nodes.length === 0 && (
+                <div className='mt-3 p-3 bg-yellow-50 border border-yellow-300 rounded-lg animate-fade-in'>
+                  <div className='flex items-center'>
+                    <svg
+                      className='w-5 h-5 text-yellow-600 mr-2 flex-shrink-0'
+                      fill='none'
+                      stroke='currentColor'
+                      viewBox='0 0 24 24'
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth={2}
+                        d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z'
+                      />
+                    </svg>
+                    <span className='text-sm text-yellow-700'>
+                      Create a database diagram first to export SQL schema.
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Logout Button */}
       <div className='mt-auto pt-4 border-t border-gray-200'>
         <button
           onClick={handleLogout}
@@ -272,7 +524,7 @@ export default function Sidebar() {
             className='w-5 h-5 mr-2'
             fill='none'
             stroke='currentColor'
-            viewBox='0 0 24 24'
+            viewB='0 0 24 24'
             xmlns='http://www.w3.org/2000/svg'
           >
             <path
@@ -285,6 +537,14 @@ export default function Sidebar() {
           Logout
         </button>
       </div>
+      {messageBox && (
+        <CustomMessageBox
+          title={messageBox.title}
+          message={messageBox.message}
+          type={messageBox.type}
+          onClose={closeCustomMessageBox}
+        />
+      )}
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
@@ -299,6 +559,19 @@ export default function Sidebar() {
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: #555;
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
       `}</style>
     </div>

@@ -76,8 +76,10 @@ export const createDbNode = (position, type, onEdit) => ({
   type: 'dbTableNode',
   position,
   data: {
-    label: `${type} node`,
+    label: `New ${type.replace('Node', ' Table')}`, // Improved default label
     onEdit,
+    tableName: 'NewTable', // Good to have a default for DB nodes
+    columns: [], // Good to have default for DB nodes
   },
   zIndex: 1,
 });
