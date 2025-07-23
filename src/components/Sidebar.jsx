@@ -87,7 +87,7 @@ export default function Sidebar({ nodes, edges }) {
   const generateSQLWithGemini = async (databaseType, diagramData) => {
     // In a real application, you would load this from an environment variable or secure configuration.
     // For this example, we'll keep it as an empty string, as per instructions for Canvas.
-    const GEMINI_API_KEY = '';
+    const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
       const prompt = `
@@ -140,8 +140,9 @@ export default function Sidebar({ nodes, edges }) {
   };
 
   const handleDatabaseExport = async (databaseType) => {
+    // This check is already in place and will show a message box.
+    // The buttons will now be disabled if nodes are empty, preventing this from being reached.
     if (nodes.length === 0) {
-      // Show a custom message box instead of alert
       showCustomMessageBox(
         'No diagram data found.',
         'Please create a database diagram first.',
@@ -255,6 +256,12 @@ export default function Sidebar({ nodes, edges }) {
   const closeCustomMessageBox = () => {
     setMessageBox(null);
   };
+
+  const isExportDisabled = isExporting || nodes.length === 0;
+  const exportButtonTitle =
+    nodes.length === 0
+      ? 'Create a database diagram first to enable export'
+      : 'Export your database schema';
 
   return (
     <div className='w-64 bg-white border-r p-4 font-sans flex flex-col h-full'>
@@ -438,8 +445,14 @@ export default function Sidebar({ nodes, edges }) {
         <div className='mb-2 flex-grow'>
           <button
             onClick={handleDatabaseDropdownClick}
-            disabled={isExporting}
-            className='w-full flex items-center justify-between text-left bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors shadow-sm'
+            disabled={isExportDisabled} // Disabled if exporting or no nodes
+            title={exportButtonTitle} // Tooltip for disabled state
+            className={`w-full flex items-center justify-between text-left bg-gray-100 p-3 rounded-lg transition-colors shadow-sm
+              ${
+                isExportDisabled
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:bg-gray-200'
+              }`}
           >
             <span className='text-base font-medium text-gray-700'>
               {isExporting ? 'Generating SQL...' : 'Export Database Schema'}
@@ -448,7 +461,7 @@ export default function Sidebar({ nodes, edges }) {
               <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white'></div>
             ) : (
               <svg
-                className={`w-5 h-5 transition-transform ${
+                className={`w-5 h-5 transition-transform text-gray-600 ${
                   isDatabaseDropdownOpen ? 'rotate-180' : ''
                 }`}
                 fill='none'
@@ -478,8 +491,16 @@ export default function Sidebar({ nodes, edges }) {
                   <button
                     key={db.id}
                     onClick={() => handleDatabaseExport(db.id)}
-                    className='flex flex-col items-center justify-center p-2 bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 ease-in-out group transform hover:scale-105 shadow-sm aspect-square' // Centered content, removed w-full, added aspect-square
-                    title={db.name} // Added title for tooltip on hover
+                    disabled={nodes.length === 0} // Disable individual buttons if no nodes
+                    className={`flex flex-col items-center justify-center p-2 bg-white rounded-lg border border-gray-200 shadow-sm aspect-square
+                      ${
+                        nodes.length === 0
+                          ? 'opacity-50 cursor-not-allowed'
+                          : 'hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 ease-in-out group transform hover:scale-105'
+                      }`}
+                    title={
+                      nodes.length === 0 ? 'Create a diagram first' : db.name
+                    } // Added title for tooltip on hover
                   >
                     <span className='text-2xl'>{db.icon}</span>{' '}
                     {/* Larger icon */}
@@ -487,7 +508,7 @@ export default function Sidebar({ nodes, edges }) {
                   </button>
                 ))}
               </div>
-              {nodes.length === 0 && (
+              {nodes.length === 0 && ( // This block is inside the dropdown content
                 <div className='mt-3 p-3 bg-yellow-50 border border-yellow-300 rounded-lg animate-fade-in'>
                   <div className='flex items-center'>
                     <svg
