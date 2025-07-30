@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import FlowPage from './pages/FlowPage';
 import ProtectedRoute from './route/ProtectedRoute';
 import ChatInterface from './pages/Chatbot';
+import CodeEditor from './pages/CodeEditor';
 
 export default function App() {
   return (
@@ -33,6 +34,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ChatInterface />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path='/code-editor'
+            element={
+              <ProtectedRoute>
+                <CodeEditor />
               </ProtectedRoute>
             }
           />
