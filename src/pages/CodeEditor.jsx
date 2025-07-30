@@ -3,7 +3,7 @@ import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-sql';
 import 'prismjs/components/prism-javascript';
-import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-python'; // Added Python grammar
 import 'prismjs/themes/prism.css';
 
 // Helper function to parse the generated markdown into a file structure
@@ -14,12 +14,10 @@ const parseGeneratedCode = (markdownText) => {
 
   while ((match = fileRegex.exec(markdownText)) !== null) {
     const fullPath = match[1].trim();
-    // Skip entries that look like outlines or descriptions
     if (fullPath.match(/^\w+\s+\w+/)) continue;
     let content = match[2].trim();
     if (!content) continue;
-    // Filter out Markdown code block markers (e.g., ```javascript or ```)
-    content = content.replace(/```(?:javascript)?\n|\n```/g, '');
+    content = content.replace(/```(?:javascript|python)?\n|\n```/g, '');
     const pathParts = fullPath.split('/');
     const fileName = pathParts.pop();
     const fileExtension = fileName.split('.').pop();
@@ -28,6 +26,7 @@ const parseGeneratedCode = (markdownText) => {
     if (fileExtension === 'json') language = 'json';
     else if (fileExtension === 'sql') language = 'sql';
     else if (fileExtension === 'md') language = 'markdown';
+    else if (fileExtension === 'py') language = 'python';
 
     files.push({
       id: fullPath,
@@ -152,18 +151,18 @@ const FileTree = ({ files, activeFileId, onFileSelect }) => {
 
 function App() {
   const initialSqlQuery = `CREATE TABLE users (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  username VARCHAR(255) NOT NULL UNIQUE,
-  email VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
 
-CREATE TABLE products (
-  product_id INT AUTO_INCREMENT PRIMARY KEY,
-  product_name VARCHAR(255) NOT NULL,
-  price DECIMAL(10, 2) NOT NULL,
-  stock_quantity INT DEFAULT 0
-);`;
+  CREATE TABLE products (
+    product_id INT AUTO_INCREMENT PRIMARY KEY,
+    product_name VARCHAR(255) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    stock_quantity INT DEFAULT 0
+  );`;
 
   const [sqlQuery, setSqlQuery] = useState(initialSqlQuery);
   const [generatedFiles, setGeneratedFiles] = useState([]);
@@ -172,6 +171,22 @@ CREATE TABLE products (
   const [error, setError] = useState('');
   const [streamOutput, setStreamOutput] = useState('');
   const [isDarkTheme, setIsDarkTheme] = useState(true);
+  const [language, setLanguage] = useState('nodejs');
+  const [webFramework, setWebFramework] = useState('');
+  const [orm, setOrm] = useState('');
+  const [dbDriver, setDbDriver] = useState('');
+  const [validation, setValidation] = useState('');
+  const [auth, setAuth] = useState('');
+  const [envVars, setEnvVars] = useState('');
+  const [reqHandling, setReqHandling] = useState('');
+  const [corsLib, setCorsLib] = useState('');
+  const [logging, setLogging] = useState('');
+  const [fileUploads, setFileUploads] = useState('');
+  const [testing, setTesting] = useState('');
+  const [apiDocs, setApiDocs] = useState('');
+  const [rateLimit, setRateLimit] = useState('');
+  const [scheduler, setScheduler] = useState('');
+  const [emailing, setEmailing] = useState('');
   const streamRef = useRef(null);
 
   const activeGeneratedFile = generatedFiles.find(
@@ -183,6 +198,70 @@ CREATE TABLE products (
   const currentGeneratedCodeLanguage = activeGeneratedFile
     ? activeGeneratedFile.language
     : 'javascript';
+
+  // Library options filtered by language
+  const libraryOptions = {
+    webFramework: {
+      nodejs: ['express', 'fastify'],
+      python: ['django', 'fastapi'],
+    },
+    orm: {
+      nodejs: ['prisma', 'sequelize', 'knex'],
+      python: ['sqlalchemy', 'tortoise-orm'],
+    },
+    dbDriver: {
+      nodejs: ['pg', 'mysql2'],
+      python: ['psycopg2', 'mysqlclient', 'pymysql'],
+    },
+    validation: {
+      nodejs: ['zod', 'joi', 'yup'],
+      python: ['pydantic', 'wtforms'],
+    },
+    auth: {
+      nodejs: ['jsonwebtoken', 'bcrypt'],
+      python: ['pyjwt', 'oauthlib'],
+    },
+    envVars: {
+      nodejs: ['dotenv'],
+      python: ['python-decouple', 'environs'],
+    },
+    reqHandling: {
+      nodejs: ['express.json', 'body-parser'],
+      python: ['fastapi', 'starlette'],
+    },
+    corsLib: {
+      nodejs: ['cors'],
+      python: ['fastapi-cors', 'starlette-cors'],
+    },
+    logging: {
+      nodejs: ['morgan', 'winston', 'pino'],
+      python: ['python-logging', 'loguru'],
+    },
+    fileUploads: {
+      nodejs: ['multer'],
+      python: ['python-multipart', 'fastapi-upload'],
+    },
+    testing: {
+      nodejs: ['jest', 'supertest', 'mocha', 'chai'],
+      python: ['pytest', 'unittest'],
+    },
+    apiDocs: {
+      nodejs: ['swagger-jsdoc', 'swagger-ui-express'],
+      python: ['fastapi-swagger-ui', 'apispec'],
+    },
+    rateLimit: {
+      nodejs: ['helmet', 'express-rate-limit'],
+      python: ['slowapi', 'limits'],
+    },
+    scheduler: {
+      nodejs: ['node-cron', 'agenda'],
+      python: ['apscheduler', 'celery'],
+    },
+    emailing: {
+      nodejs: ['nodemailer'],
+      python: ['smtplib', 'flask-mail'],
+    },
+  };
 
   const simulateEventStream = async (apiResponseText) => {
     setStreamOutput('');
@@ -201,33 +280,96 @@ CREATE TABLE products (
     setActiveGeneratedFileId(null);
     setStreamOutput('');
 
-    const prompt = `Generate a complete Node.js Express backend application for the following SQL schema.
-    The application should support the SQL dialect provided in the schema (e.g., MySQL or PostgreSQL) and include Swagger documentation using swagger-ui-express.
-    Use the appropriate database library based on the dialect: 'mysql2' for MySQL (with ? for parameterized queries) or 'pg' for PostgreSQL (with $1, $2 for parameterized queries).
-    Organize the code into a clear folder structure, including:
-    - \`package.json\` (project dependencies)
-    - \`.env\` (environment variables)
-    - \`src/app.js\` (main application setup with Swagger at /api-docs and 404 middleware)
-    - \`src/config/db.js\` (database connection)
-    - \`src/models/usersModel.js\` (CRUD operations for users table)
-    - \`src/models/productsModel.js\` (CRUD operations for products table)
-    - \`src/controllers/usersController.js\` (controller logic for users)
-    - \`src/controllers/productsController.js\` (controller logic for products)
-    - \`src/routes/usersRoutes.js\` (API routes for users)
-    - \`src/routes/productsRoutes.js\` (API routes for products)
-    - \`src/swagger.json\` (Swagger configuration)
+    let prompt = `Generate a complete backend application for the following SQL schema in ${language}.
+    `;
+    if (language === 'nodejs' && webFramework) {
+      prompt += `Use ${webFramework} as the web framework`;
+      if (orm) prompt += `, ${orm} as the ORM/query builder`;
+      if (dbDriver) prompt += `, ${dbDriver} as the database driver`;
+      if (validation) prompt += `, ${validation} for validation`;
+      if (auth) prompt += `, ${auth} for authentication`;
+      if (envVars) prompt += `, ${envVars} for environment variables`;
+      if (reqHandling) prompt += `, ${reqHandling} for request handling`;
+      if (corsLib) prompt += `, ${corsLib} for CORS`;
+      if (logging) prompt += `, ${logging} for logging`;
+      if (fileUploads) prompt += `, ${fileUploads} for file uploads`;
+      if (testing) prompt += `, ${testing} for testing`;
+      if (apiDocs) prompt += `, ${apiDocs} for API documentation`;
+      if (rateLimit) prompt += `, ${rateLimit} for rate limiting/security`;
+      if (scheduler) prompt += `, ${scheduler} for scheduling`;
+      if (emailing) prompt += `, ${emailing} for emailing`;
 
-    For each table in the SQL schema, create corresponding model, controller, and route files with standard CRUD operations (create, read, update, delete).
-    Use parameterized queries appropriate to the dialect (e.g., ? for MySQL, $1 for PostgreSQL).
-    Include a 404 Not Found middleware and define product and user routes.
-    Ensure proper error handling and modularity. Do not include outline comments or descriptions (e.g., 'Middleware to parse JSON bodies'); provide only the actual file contents.
-    Return only the code for each file, prefixed with '// ' followed by the file path.
+      prompt += `. Organize the code into a clear folder structure, including:
+      - \`package.json\` (project dependencies)
+      - \`.env\` (environment variables)
+      - \`src/app.js\` (main application setup with API docs and 404 middleware)
+      - \`src/config/db.js\` (database connection)
+      - \`src/models/usersModel.js\` (model for users table)
+      - \`src/models/productsModel.js\` (model for products table)
+      - \`src/controllers/usersController.js\` (controller logic for users)
+      - \`src/controllers/productsController.js\` (controller logic for products)
+      - \`src/routes/usersRoutes.js\` (API routes for users)
+      - \`src/routes/productsRoutes.js\` (API routes for products)
+      - \`src/swagger.json\` (Swagger configuration, if applicable)
 
+      For each table in the SQL schema, create corresponding model, controller, and route files with standard CRUD operations (create, read, update, delete).
+      Use parameterized queries appropriate to the database driver (e.g., ? for mysql2, $1 for pg).
+      Include a 404 Not Found middleware and define product and user routes.
+      Ensure proper error handling and modularity. Do not include outline comments or descriptions; provide only the actual file contents.
+      Return only the code for each file, prefixed with '// ' followed by the file path.
+      `;
+    } else if (language === 'python' && webFramework) {
+      prompt += `Use ${webFramework} as the web framework`;
+      if (orm) prompt += `, ${orm} as the ORM/query builder`;
+      if (dbDriver) prompt += `, ${dbDriver} as the database driver`;
+      if (validation) prompt += `, ${validation} for validation`;
+      if (auth) prompt += `, ${auth} for authentication`;
+      if (envVars) prompt += `, ${envVars} for environment variables`;
+      if (reqHandling) prompt += `, ${reqHandling} for request handling`;
+      if (corsLib) prompt += `, ${corsLib} for CORS`;
+      if (logging) prompt += `, ${logging} for logging`;
+      if (fileUploads) prompt += `, ${fileUploads} for file uploads`;
+      if (testing) prompt += `, ${testing} for testing`;
+      if (apiDocs) prompt += `, ${apiDocs} for API documentation`;
+      if (rateLimit) prompt += `, ${rateLimit} for rate limiting/security`;
+      if (scheduler) prompt += `, ${scheduler} for scheduling`;
+      if (emailing) prompt += `, ${emailing} for emailing`;
+
+      prompt += `. Organize the code into a ${
+        webFramework === 'django'
+          ? 'Django project structure'
+          : 'FastAPI project structure'
+      }, including:
+      - \`requirements.txt\` (project dependencies)
+      - \`.env\` (environment variables)
+      ${
+        webFramework === 'django'
+          ? '- `manage.py` (Django management script)\n- `project/settings.py` (project settings)\n- `project/urls.py` (URL configuration)\n- `users/models.py` (model for users table)\n- `users/views.py` (views for users)\n- `products/models.py` (model for products table)\n- `products/views.py` (views for products)\n- `users/urls.py` (URL routes for users)\n- `products/urls.py` (URL routes for products)'
+          : '- `main.py` (main FastAPI application)\n- `database.py` (database connection)\n- `models/users.py` (model for users table)\n- `models/products.py` (model for products table)\n- `routes/users.py` (API routes for users)\n- `routes/products.py` (API routes for products)'
+      }
+
+      For each table in the SQL schema, create corresponding models and ${
+        webFramework === 'django' ? 'views' : 'endpoints'
+      } with standard CRUD operations.
+      Use parameterized queries appropriate to the database driver.
+      Include a 404 Not Found handler and define user and product routes.
+      Ensure proper error handling and modularity. Do not include outline comments or descriptions; provide only the actual file contents.
+      Return only the code for each file, prefixed with '// ' followed by the file path.
+      `;
+    }
+
+    prompt += `
     SQL Schema:
     \`\`\`sql
     ${sqlQuery}
     \`\`\`
     `;
+
+    if (!webFramework) {
+      setError('Please select a web framework.');
+      setLoadingBackend(false);
+      return;
+    }
 
     const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
     if (!API_KEY) {
@@ -352,152 +494,440 @@ CREATE TABLE products (
         )}
 
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-8'>
-          {/* SQL Query Editor */}
+          {/* Configuration Panel */}
           <div>
             <h2
               className={`text-2xl font-semibold mb-4 ${
                 isDarkTheme ? 'text-blue-300' : 'text-blue-600'
               }`}
             >
-              SQL Schema Input
+              Configuration
             </h2>
             <div
-              className={`border rounded-lg overflow-hidden ${
+              className={`border rounded-lg p-4 ${
                 isDarkTheme
                   ? 'bg-gray-800 border-gray-700'
                   : 'bg-gray-100 border-gray-300'
               }`}
             >
-              <Editor
-                value={sqlQuery}
-                onValueChange={setSqlQuery}
-                highlight={(code) =>
-                  Prism.highlight(code, Prism.languages.sql, 'sql')
-                }
-                padding={16}
-                className={`font-mono text-sm min-h-[400px] ${
+              <div className='mb-4'>
+                <label className='block mb-2'>Language</label>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value='nodejs'>Node.js</option>
+                  <option value='python'>Python</option>
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>Web Framework</label>
+                <select
+                  value={webFramework}
+                  onChange={(e) => setWebFramework(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select a framework</option>
+                  {libraryOptions.webFramework[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>ORM/Query Builder</label>
+                <select
+                  value={orm}
+                  onChange={(e) => setOrm(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select an ORM</option>
+                  {libraryOptions.orm[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>Database Driver</label>
+                <select
+                  value={dbDriver}
+                  onChange={(e) => setDbDriver(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select a driver</option>
+                  {libraryOptions.dbDriver[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}{' '}
+                      {language === 'nodejs' && option === 'pg'
+                        ? '(PostgreSQL)'
+                        : language === 'nodejs' && option === 'mysql2'
+                        ? '(MySQL)'
+                        : language === 'python' && option === 'psycopg2'
+                        ? '(PostgreSQL)'
+                        : '(MySQL)'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>Validation</label>
+                <select
+                  value={validation}
+                  onChange={(e) => setValidation(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select validation</option>
+                  {libraryOptions.validation[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>Authentication</label>
+                <select
+                  value={auth}
+                  onChange={(e) => setAuth(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select authentication</option>
+                  {libraryOptions.auth[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>Environment Variables</label>
+                <select
+                  value={envVars}
+                  onChange={(e) => setEnvVars(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select env vars</option>
+                  {libraryOptions.envVars[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>Request Handling</label>
+                <select
+                  value={reqHandling}
+                  onChange={(e) => setReqHandling(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select request handling</option>
+                  {libraryOptions.reqHandling[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>CORS</label>
+                <select
+                  value={corsLib}
+                  onChange={(e) => setCorsLib(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select CORS</option>
+                  {libraryOptions.corsLib[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>Logging</label>
+                <select
+                  value={logging}
+                  onChange={(e) => setLogging(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select logging</option>
+                  {libraryOptions.logging[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>File Uploads</label>
+                <select
+                  value={fileUploads}
+                  onChange={(e) => setFileUploads(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select file uploads</option>
+                  {libraryOptions.fileUploads[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>Testing</label>
+                <select
+                  value={testing}
+                  onChange={(e) => setTesting(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select testing</option>
+                  {libraryOptions.testing[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>API Docs</label>
+                <select
+                  value={apiDocs}
+                  onChange={(e) => setApiDocs(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select API docs</option>
+                  {libraryOptions.apiDocs[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>Rate Limiting/Security</label>
+                <select
+                  value={rateLimit}
+                  onChange={(e) => setRateLimit(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select rate limit</option>
+                  {libraryOptions.rateLimit[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>Scheduler</label>
+                <select
+                  value={scheduler}
+                  onChange={(e) => setScheduler(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select scheduler</option>
+                  {libraryOptions.scheduler[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='mb-4'>
+                <label className='block mb-2'>Emailing</label>
+                <select
+                  value={emailing}
+                  onChange={(e) => setEmailing(e.target.value)}
+                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
+                >
+                  <option value=''>Select emailing</option>
+                  {libraryOptions.emailing[language].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={generateBackendCode}
+                className={`w-full px-4 py-2 mt-4 rounded-lg ${
                   isDarkTheme
-                    ? 'bg-gray-800 text-gray-200'
-                    : 'bg-gray-100 text-gray-800'
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                } transition-all duration-300 ${
+                  loadingBackend || !sqlQuery.trim() || !webFramework
+                    ? 'opacity-50 cursor-not-allowed'
+                    : ''
                 }`}
-                style={{ fontFamily: '"Fira Code", monospace', fontSize: 14 }}
-              />
+                disabled={loadingBackend || !sqlQuery.trim() || !webFramework}
+              >
+                {loadingBackend ? (
+                  <span className='flex items-center justify-center'>
+                    <svg
+                      className='animate-spin mr-3 h-5 w-5 text-white'
+                      fill='none'
+                      viewBox='0 0 24 24'
+                    >
+                      <circle
+                        className='opacity-25'
+                        cx='12'
+                        cy='12'
+                        r='10'
+                        stroke='currentColor'
+                        strokeWidth='4'
+                      />
+                      <path
+                        className='opacity-75'
+                        fill='currentColor'
+                        d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                      />
+                    </svg>
+                    Generating...
+                  </span>
+                ) : (
+                  'Generate Backend Code'
+                )}
+              </button>
             </div>
           </div>
 
-          {/* Generated Code Section */}
+          {/* SQL Query Editor and Generated Code Section */}
           <div className='flex flex-col'>
             <h2
               className={`text-2xl font-semibold mb-4 ${
                 isDarkTheme ? 'text-blue-300' : 'text-blue-600'
               }`}
             >
-              Generated Backend Code
+              SQL Schema Input & Generated Code
             </h2>
             <div
-              className={`flex flex-1 border rounded-lg overflow-hidden ${
+              className={`flex-1 border rounded-lg overflow-hidden ${
                 isDarkTheme
                   ? 'bg-gray-800 border-gray-700'
                   : 'bg-gray-100 border-gray-300'
               }`}
             >
-              {/* File Tree Sidebar */}
-              <div
-                className={`w-1/3 ${
-                  isDarkTheme
-                    ? 'bg-gray-850 border-r border-gray-700'
-                    : 'bg-white border-r border-gray-300'
-                } overflow-y-auto`}
-              >
-                <h3
-                  className={`text-lg font-medium p-4 border-b ${
+              {/* SQL Query Editor */}
+              <div className='p-4 border-b'>
+                <Editor
+                  value={sqlQuery}
+                  onValueChange={setSqlQuery}
+                  highlight={(code) =>
+                    Prism.highlight(code, Prism.languages.sql, 'sql')
+                  }
+                  padding={16}
+                  className={`font-mono text-sm min-h-[200px] ${
                     isDarkTheme
-                      ? 'text-gray-300 border-gray-700'
-                      : 'text-gray-700 border-gray-300'
+                      ? 'bg-gray-800 text-gray-200'
+                      : 'bg-gray-100 text-gray-800'
                   }`}
-                >
-                  Project Structure
-                </h3>
-                {generatedFiles.length > 0 ? (
-                  <FileTree
-                    files={generatedFiles}
-                    activeFileId={activeGeneratedFileId}
-                    onFileSelect={setActiveGeneratedFileId}
-                  />
-                ) : (
-                  <p
-                    className={`text-sm p-4 ${
-                      isDarkTheme ? 'text-gray-400' : 'text-gray-500'
-                    }`}
-                  >
-                    Generate code to view project structure.
-                  </p>
-                )}
+                  style={{ fontFamily: '"Fira Code", monospace', fontSize: 14 }}
+                />
               </div>
-
-              {/* Code Editor Area */}
-              <div className='flex-1 flex flex-col'>
+              {/* File Tree and Code Editor Area */}
+              <div className='flex'>
                 <div
-                  className={`flex items-center justify-between ${
+                  className={`w-1/3 ${
                     isDarkTheme
-                      ? 'bg-gray-850 border-b border-gray-700'
-                      : 'bg-white border-b border-gray-300'
-                  } px-4 py-3`}
+                      ? 'bg-gray-850 border-r border-gray-700'
+                      : 'bg-white border-r border-gray-300'
+                  } overflow-y-auto`}
                 >
-                  <span
-                    className={`text-sm font-medium ${
-                      isDarkTheme ? 'text-gray-300' : 'text-gray-700'
+                  <h3
+                    className={`text-lg font-medium p-4 border-b ${
+                      isDarkTheme
+                        ? 'text-gray-300 border-gray-700'
+                        : 'text-gray-700 border-gray-300'
                     }`}
                   >
-                    {activeGeneratedFile
-                      ? activeGeneratedFile.path
-                      : 'Select a file'}
-                  </span>
-                  <button
-                    onClick={() => copyToClipboard(currentGeneratedCode)}
-                    className={`px-4 py-2 rounded-lg ${
-                      isDarkTheme
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                    } text-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed`}
-                    disabled={!currentGeneratedCode}
-                  >
-                    Copy Code
-                  </button>
+                    Project Structure
+                  </h3>
+                  {generatedFiles.length > 0 ? (
+                    <FileTree
+                      files={generatedFiles}
+                      activeFileId={activeGeneratedFileId}
+                      onFileSelect={setActiveGeneratedFileId}
+                    />
+                  ) : (
+                    <p
+                      className={`text-sm p-4 ${
+                        isDarkTheme ? 'text-gray-400' : 'text-gray-500'
+                      }`}
+                    >
+                      Generate code to view project structure.
+                    </p>
+                  )}
                 </div>
-                <div className='flex-1 overflow-auto p-4'>
-                  <Editor
-                    value={currentGeneratedCode}
-                    onValueChange={(code) =>
-                      setGeneratedFiles((prevFiles) =>
-                        prevFiles.map((file) =>
-                          file.id === activeGeneratedFileId
-                            ? { ...file, content: code }
-                            : file
-                        )
-                      )
-                    }
-                    highlight={(code) => {
-                      const grammar =
-                        Prism.languages[currentGeneratedCodeLanguage] ||
-                        Prism.languages.javascript;
-                      return Prism.highlight(
-                        code,
-                        grammar,
-                        currentGeneratedCodeLanguage
-                      );
-                    }}
-                    padding={16}
-                    className={`font-mono text-sm w-full ${
+                <div className='flex-1 flex flex-col'>
+                  <div
+                    className={`flex items-center justify-between ${
                       isDarkTheme
-                        ? 'bg-gray-800 text-gray-200'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
-                    style={{
-                      fontFamily: '"Fira Code", monospace',
-                      fontSize: 14,
-                    }}
-                  />
+                        ? 'bg-gray-850 border-b border-gray-700'
+                        : 'bg-white border-b border-gray-300'
+                    } px-4 py-3`}
+                  >
+                    <span
+                      className={`text-sm font-medium ${
+                        isDarkTheme ? 'text-gray-300' : 'text-gray-700'
+                      }`}
+                    >
+                      {activeGeneratedFile
+                        ? activeGeneratedFile.path
+                        : 'Select a file'}
+                    </span>
+                    <button
+                      onClick={() => copyToClipboard(currentGeneratedCode)}
+                      className={`px-4 py-2 rounded-lg ${
+                        isDarkTheme
+                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          : 'bg-blue-500 text-white hover:bg-blue-600'
+                      } text-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed`}
+                      disabled={!currentGeneratedCode}
+                    >
+                      Copy Code
+                    </button>
+                  </div>
+                  <div className='flex-1 overflow-auto p-4'>
+                    <Editor
+                      value={currentGeneratedCode}
+                      onValueChange={(code) =>
+                        setGeneratedFiles((prevFiles) =>
+                          prevFiles.map((file) =>
+                            file.id === activeGeneratedFileId
+                              ? { ...file, content: code }
+                              : file
+                          )
+                        )
+                      }
+                      highlight={(code) => {
+                        const grammar =
+                          Prism.languages[currentGeneratedCodeLanguage] ||
+                          (language === 'python'
+                            ? Prism.languages.python
+                            : Prism.languages.javascript);
+                        return Prism.highlight(
+                          code,
+                          grammar,
+                          currentGeneratedCodeLanguage
+                        );
+                      }}
+                      padding={16}
+                      className={`font-mono text-sm w-full ${
+                        isDarkTheme
+                          ? 'bg-gray-800 text-gray-200'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                      style={{
+                        fontFamily: '"Fira Code", monospace',
+                        fontSize: 14,
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -530,50 +960,6 @@ CREATE TABLE products (
           </div>
         )}
 
-        {/* Generate Button */}
-        <div className='flex justify-center mt-8'>
-          <button
-            onClick={generateBackendCode}
-            className={`px-8 py-4 rounded-lg shadow-lg ${
-              isDarkTheme
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-blue-500 text-white hover:bg-blue-600'
-            } transition-all duration-300 ${
-              loadingBackend || !sqlQuery.trim()
-                ? 'opacity-50 cursor-not-allowed'
-                : ''
-            }`}
-            disabled={loadingBackend || !sqlQuery.trim()}
-          >
-            {loadingBackend ? (
-              <span className='flex items-center'>
-                <svg
-                  className='animate-spin mr-3 h-5 w-5 text-white'
-                  fill='none'
-                  viewBox='0 0 24 24'
-                >
-                  <circle
-                    className='opacity-25'
-                    cx='12'
-                    cy='12'
-                    r='10'
-                    stroke='currentColor'
-                    strokeWidth='4'
-                  />
-                  <path
-                    className='opacity-75'
-                    fill='currentColor'
-                    d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                  />
-                </svg>
-                Generating...
-              </span>
-            ) : (
-              'Generate Backend Code'
-            )}
-          </button>
-        </div>
-
         <div
           className={`mt-8 text-center text-sm ${
             isDarkTheme ? 'text-gray-400' : 'text-gray-600'
@@ -583,22 +969,21 @@ CREATE TABLE products (
             **Security Note:** For production, store your Gemini API key
             securely on a backend server or use serverless functions.
           </p>
-          {generatedFiles.some((file) => file.name === 'app.js') && (
+          {generatedFiles.some(
+            (file) =>
+              file.name === 'app.js' ||
+              file.name === 'manage.py' ||
+              file.name === 'main.py'
+          ) && (
             <p className='mt-2'>
-              **Swagger URL:**{' '}
-              <a
-                href='http://localhost:3000/api-docs'
-                target='_blank'
-                rel='noopener noreferrer'
-                className={`underline ${
-                  isDarkTheme ? 'text-blue-400' : 'text-blue-600'
-                }`}
-              >
-                http://localhost:3000/api-docs
-              </a>
-              <br />
-              **Terminal Command:** <code>npm start</code> or{' '}
-              <code>node src/app.js</code>
+              **Run Command:**{' '}
+              <code>
+                {language === 'nodejs'
+                  ? 'npm start'
+                  : webFramework === 'django'
+                  ? 'python manage.py runserver'
+                  : 'uvicorn main:app --reload'}
+              </code>
             </p>
           )}
         </div>
