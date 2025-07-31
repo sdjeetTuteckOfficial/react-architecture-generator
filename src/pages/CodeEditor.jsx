@@ -3,8 +3,25 @@ import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-sql';
 import 'prismjs/components/prism-javascript';
-import 'prismjs/components/prism-python'; // Added Python grammar
-import 'prismjs/themes/prism.css';
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-markdown';
+import 'prismjs/themes/prism-dark.css';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
+import {
+  ChevronRight,
+  ChevronDown,
+  File,
+  Folder,
+  FolderOpen,
+  Copy,
+  Download,
+  Settings,
+  Play,
+  Search,
+  X,
+} from 'lucide-react';
 
 // Helper function to parse the generated markdown into a file structure
 const parseGeneratedCode = (markdownText) => {
@@ -17,7 +34,10 @@ const parseGeneratedCode = (markdownText) => {
     if (fullPath.match(/^\w+\s+\w+/)) continue;
     let content = match[2].trim();
     if (!content) continue;
-    content = content.replace(/```(?:javascript|python)?\n|\n```/g, '');
+    content = content.replace(
+      /```(?:javascript|python|json|sql|markdown)?\n|\n```/g,
+      ''
+    );
     const pathParts = fullPath.split('/');
     const fileName = pathParts.pop();
     const fileExtension = fileName.split('.').pop();
@@ -40,8 +60,11 @@ const parseGeneratedCode = (markdownText) => {
   return files;
 };
 
-// Component to render an enhanced file tree with parent files at bottom
-const FileTree = ({ files, activeFileId, onFileSelect }) => {
+// VS Code-like file tree component
+const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
+  const [expandedDirs, setExpandedDirs] = useState({});
+  const [searchTerm, setSearchTerm] = useState('');
+
   const tree = {};
   const parentFiles = [];
   const folderFiles = [];
@@ -66,90 +89,740 @@ const FileTree = ({ files, activeFileId, onFileSelect }) => {
     }
   });
 
-  const renderTree = (node, path = '', depth = 0) => {
-    return Object.keys(node)
-      .sort()
-      .map((key) => {
-        const item = node[key];
-        const currentPath = path ? `${path}/${key}` : key;
-
-        if (item.type === 'directory') {
-          return (
-            <div key={currentPath} className={`ml-${depth * 4}`}>
-              <div className='flex items-center text-blue-600 font-medium mb-2'>
-                <svg
-                  className='h-4 w-4 mr-2'
-                  fill='none'
-                  stroke='currentColor'
-                  viewBox='0 0 24 24'
-                >
-                  <path d='M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' />
-                </svg>
-                {key}
-              </div>
-              {renderTree(item.children, currentPath, depth + 1)}
-            </div>
-          );
-        } else {
-          return (
-            <div
-              key={item.id}
-              className={`ml-${
-                depth * 4
-              } flex items-center py-1 px-3 rounded-lg cursor-pointer text-sm transition-all duration-300 ${
-                activeFileId === item.id
-                  ? 'bg-blue-200 text-blue-800'
-                  : 'hover:bg-gray-100 text-gray-800'
-              }`}
-              onClick={() => onFileSelect(item.id)}
-            >
-              <svg
-                className='h-4 w-4 mr-2 text-gray-500'
-                fill='none'
-                stroke='currentColor'
-                viewBox='0 0 24 24'
-              >
-                <path d='M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2h-3.54L9 3H5a2 2 0 00-2 2v14a2 2 0 002 2z' />
-              </svg>
-              {item.name}
-            </div>
-          );
-        }
-      });
+  const toggleDirectory = (path) => {
+    setExpandedDirs((prev) => ({
+      ...prev,
+      [path]: !prev[path],
+    }));
   };
 
-  return (
-    <div className='p-4 bg-gray-50 rounded-lg'>
-      {Object.keys(tree).length > 0 && renderTree(tree)}
-      {parentFiles.map((file) => (
-        <div
-          key={file.id}
-          className={`flex items-center py-1 px-3 rounded-lg cursor-pointer text-sm transition-all duration-300 ${
-            activeFileId === file.id
-              ? 'bg-blue-200 text-blue-800'
-              : 'hover:bg-gray-100 text-gray-800'
-          }`}
-          onClick={() => onFileSelect(file.id)}
-        >
-          <svg
-            className='h-4 w-4 mr-2 text-gray-500'
-            fill='none'
-            stroke='currentColor'
-            viewBox='0 0 24 24'
+  const getFileIcon = (fileName) => {
+    const ext = fileName.split('.').pop().toLowerCase();
+    const iconStyle = 'w-3 h-3 mr-2';
+
+    switch (ext) {
+      case 'js':
+        return (
+          <div
+            className={`${iconStyle} bg-yellow-500 rounded-sm flex items-center justify-center text-[10px] font-bold text-black`}
           >
-            <path d='M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2h-3.54L9 3H5a2 2 0 00-2 2v14a2 2 0 002 2z' />
-          </svg>
-          {file.name}
+            JS
+          </div>
+        );
+      case 'py':
+        return (
+          <div
+            className={`${iconStyle} bg-blue-500 rounded-sm flex items-center justify-center text-[10px] font-bold text-white`}
+          >
+            PY
+          </div>
+        );
+      case 'json':
+        return (
+          <div
+            className={`${iconStyle} bg-orange-400 rounded-sm flex items-center justify-center text-[10px] font-bold text-black`}
+          >
+            {}
+          </div>
+        );
+      case 'sql':
+        return (
+          <div
+            className={`${iconStyle} bg-purple-500 rounded-sm flex items-center justify-center text-[10px] font-bold text-white`}
+          >
+            SQL
+          </div>
+        );
+      case 'md':
+        return (
+          <div
+            className={`${iconStyle} bg-gray-400 rounded-sm flex items-center justify-center text-[10px] font-bold text-black`}
+          >
+            MD
+          </div>
+        );
+      case 'env':
+        return (
+          <div
+            className={`${iconStyle} bg-green-500 rounded-sm flex items-center justify-center text-[10px] font-bold text-white`}
+          >
+            .ENV
+          </div>
+        );
+      default:
+        return <File className={iconStyle} />;
+    }
+  };
+
+  const renderTree = (node, path = '', depth = 0) => {
+    const filteredEntries = Object.entries(node)
+      .filter(([key, item]) => {
+        if (item.type === 'file') {
+          return key.toLowerCase().includes(searchTerm.toLowerCase());
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const aIsDir = a[1].type === 'directory';
+        const bIsDir = b[1].type === 'directory';
+        if (aIsDir && !bIsDir) return -1;
+        if (!aIsDir && bIsDir) return 1;
+        return a[0].localeCompare(b[0]);
+      });
+
+    return filteredEntries.map(([key, item]) => {
+      const currentPath = path ? `${path}/${key}` : key;
+      const paddingLeft = `${depth * 16 + 8}px`;
+
+      if (item.type === 'directory') {
+        const isExpanded = expandedDirs[currentPath] !== false;
+        return (
+          <div key={currentPath}>
+            <div
+              className='flex items-center h-6 px-2 text-xs cursor-pointer hover:bg-gray-700/50 text-gray-300'
+              style={{ paddingLeft }}
+              onClick={() => toggleDirectory(currentPath)}
+            >
+              {isExpanded ? (
+                <ChevronDown className='w-3 h-3 mr-1 text-gray-400' />
+              ) : (
+                <ChevronRight className='w-3 h-3 mr-1 text-gray-400' />
+              )}
+              {isExpanded ? (
+                <FolderOpen className='w-3 h-3 mr-1 text-blue-400' />
+              ) : (
+                <Folder className='w-3 h-3 mr-1 text-blue-400' />
+              )}
+              <span className='truncate'>{key}</span>
+            </div>
+            {isExpanded && renderTree(item.children, currentPath, depth + 1)}
+          </div>
+        );
+      } else {
+        return (
+          <div
+            key={item.id}
+            className={`flex items-center h-6 px-2 text-xs cursor-pointer hover:bg-gray-700/50 ${
+              activeFileId === item.id
+                ? 'bg-blue-600/50 text-white'
+                : 'text-gray-300'
+            }`}
+            style={{ paddingLeft }}
+            onClick={() => onFileSelect(item.id)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              onCopyPath(item.path);
+            }}
+          >
+            {getFileIcon(item.name)}
+            <span className='truncate'>{item.name}</span>
+          </div>
+        );
+      }
+    });
+  };
+
+  useEffect(() => {
+    setExpandedDirs({}); // Auto-expand all directories by default
+  }, [files]);
+
+  return (
+    <div className='flex flex-col h-full bg-gray-800'>
+      <div className='p-2 border-b border-gray-700'>
+        <div className='relative'>
+          <Search className='absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400' />
+          <input
+            type='text'
+            placeholder='Search files...'
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className='w-full pl-8 pr-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded text-gray-200 placeholder-gray-400 focus:outline-none focus:border-blue-500'
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className='absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200'
+            >
+              <X className='w-4 h-4' />
+            </button>
+          )}
         </div>
-      ))}
-      {files.length === 0 && (
-        <p className='text-gray-500 text-sm'>No files to display.</p>
-      )}
+      </div>
+      <div className='flex-1 overflow-y-auto'>
+        {files.length > 0 ? (
+          renderTree(tree)
+        ) : (
+          <p className='text-xs p-2 text-gray-400 font-mono text-center'>
+            No files to display
+          </p>
+        )}
+      </div>
     </div>
   );
 };
 
-function App() {
+// Configuration modal component
+const ConfigModal = ({
+  language,
+  setLanguage,
+  webFramework,
+  setWebFramework,
+  orm,
+  setOrm,
+  dbDriver,
+  setDbDriver,
+  validation,
+  setValidation,
+  auth,
+  setAuth,
+  envVars,
+  setEnvVars,
+  reqHandling,
+  setReqHandling,
+  corsLib,
+  setCorsLib,
+  logging,
+  setLogging,
+  fileUploads,
+  setFileUploads,
+  testing,
+  setTesting,
+  apiDocs,
+  setApiDocs,
+  rateLimit,
+  setRateLimit,
+  scheduler,
+  setScheduler,
+  emailing,
+  setEmailing,
+  onGenerate,
+  isLoading,
+  onClose,
+}) => {
+  const libraryOptions = {
+    language: [
+      {
+        value: 'nodejs',
+        label: 'JavaScript (Node.js)',
+        tooltip: 'Backend development with Node.js',
+      },
+      {
+        value: 'python',
+        label: 'Python',
+        tooltip: 'Backend development with Python',
+      },
+    ],
+    webFramework: {
+      nodejs: [
+        {
+          value: 'express',
+          label: 'Express',
+          tooltip: 'Lightweight and flexible Node.js web framework',
+        },
+        {
+          value: 'fastify',
+          label: 'Fastify',
+          tooltip: 'High-performance Node.js framework with low overhead',
+        },
+      ],
+      python: [
+        {
+          value: 'django',
+          label: 'Django',
+          tooltip: 'High-level Python web framework with batteries included',
+        },
+        {
+          value: 'fastapi',
+          label: 'FastAPI',
+          tooltip: 'Modern, fast Python web framework for APIs',
+        },
+      ],
+    },
+    orm: {
+      nodejs: [
+        {
+          value: 'prisma',
+          label: 'Prisma',
+          tooltip: 'Modern ORM with type-safe database access',
+        },
+        {
+          value: 'sequelize',
+          label: 'Sequelize',
+          tooltip: 'Promise-based ORM for Node.js',
+        },
+        {
+          value: 'knex',
+          label: 'Knex',
+          tooltip: 'SQL query builder for Node.js',
+        },
+      ],
+      python: [
+        {
+          value: 'sqlalchemy',
+          label: 'SQLAlchemy',
+          tooltip: 'Python SQL toolkit and ORM',
+        },
+        {
+          value: 'tortoise-orm',
+          label: 'Tortoise ORM',
+          tooltip: 'Async ORM for Python',
+        },
+      ],
+    },
+    dbDriver: {
+      nodejs: [
+        {
+          value: 'pg',
+          label: 'pg (PostgreSQL)',
+          tooltip: 'PostgreSQL client for Node.js',
+        },
+        {
+          value: 'mysql2',
+          label: 'mysql2 (MySQL)',
+          tooltip: 'Fast MySQL client for Node.js',
+        },
+      ],
+      python: [
+        {
+          value: 'psycopg2',
+          label: 'psycopg2 (PostgreSQL)',
+          tooltip: 'PostgreSQL adapter for Python',
+        },
+        {
+          value: 'mysqlclient',
+          label: 'mysqlclient (MySQL)',
+          tooltip: 'MySQL client for Python',
+        },
+        {
+          value: 'pymysql',
+          label: 'pymysql (MySQL)',
+          tooltip: 'Pure-Python MySQL client',
+        },
+      ],
+    },
+    validation: {
+      nodejs: [
+        {
+          value: 'zod',
+          label: 'Zod',
+          tooltip: 'TypeScript-first schema validation',
+        },
+        {
+          value: 'joi',
+          label: 'Joi',
+          tooltip: 'Object schema validation for JavaScript',
+        },
+        {
+          value: 'yup',
+          label: 'Yup',
+          tooltip: 'Schema builder for value parsing and validation',
+        },
+      ],
+      python: [
+        {
+          value: 'pydantic',
+          label: 'Pydantic',
+          tooltip: 'Data validation using Python type hints',
+        },
+        {
+          value: 'wtforms',
+          label: 'WTForms',
+          tooltip: 'Form validation for Python',
+        },
+      ],
+    },
+    auth: {
+      nodejs: [
+        {
+          value: 'jsonwebtoken',
+          label: 'jsonwebtoken',
+          tooltip: 'JWT-based authentication for Node.js',
+        },
+        {
+          value: 'bcrypt',
+          label: 'bcrypt',
+          tooltip: 'Password hashing for Node.js',
+        },
+      ],
+      python: [
+        {
+          value: 'pyjwt',
+          label: 'PyJWT',
+          tooltip: 'JWT implementation for Python',
+        },
+        {
+          value: 'oauthlib',
+          label: 'OAuthLib',
+          tooltip: 'OAuth implementation for Python',
+        },
+      ],
+    },
+    envVars: {
+      nodejs: [
+        {
+          value: 'dotenv',
+          label: 'dotenv',
+          tooltip: 'Loads environment variables from .env file',
+        },
+      ],
+      python: [
+        {
+          value: 'python-decouple',
+          label: 'python-decouple',
+          tooltip: 'Separates settings from code',
+        },
+        {
+          value: 'environs',
+          label: 'environs',
+          tooltip: 'Environment variable parsing for Python',
+        },
+      ],
+    },
+    reqHandling: {
+      nodejs: [
+        {
+          value: 'express.json',
+          label: 'express.json',
+          tooltip: 'Built-in Express JSON parser',
+        },
+        {
+          value: 'body-parser',
+          label: 'body-parser',
+          tooltip: 'Node.js body parsing middleware',
+        },
+      ],
+      python: [
+        {
+          value: 'fastapi',
+          label: 'FastAPI',
+          tooltip: 'Built-in request handling for FastAPI',
+        },
+        {
+          value: 'starlette',
+          label: 'Starlette',
+          tooltip: 'ASGI framework for request handling',
+        },
+      ],
+    },
+    corsLib: {
+      nodejs: [
+        {
+          value: 'cors',
+          label: 'cors',
+          tooltip: 'CORS middleware for Express',
+        },
+      ],
+      python: [
+        {
+          value: 'fastapi-cors',
+          label: 'fastapi-cors',
+          tooltip: 'CORS support for FastAPI',
+        },
+        {
+          value: 'starlette-cors',
+          label: 'starlette-cors',
+          tooltip: 'CORS support for Starlette',
+        },
+      ],
+    },
+    logging: {
+      nodejs: [
+        {
+          value: 'morgan',
+          label: 'morgan',
+          tooltip: 'HTTP request logger for Node.js',
+        },
+        {
+          value: 'winston',
+          label: 'winston',
+          tooltip: 'Versatile logging library for Node.js',
+        },
+        {
+          value: 'pino',
+          label: 'pino',
+          tooltip: 'Fast and low-overhead logger for Node.js',
+        },
+      ],
+      python: [
+        {
+          value: 'python-logging',
+          label: 'python-logging',
+          tooltip: 'Built-in Python logging module',
+        },
+        {
+          value: 'loguru',
+          label: 'loguru',
+          tooltip: 'Simplified logging for Python',
+        },
+      ],
+    },
+    fileUploads: {
+      nodejs: [
+        {
+          value: 'multer',
+          label: 'multer',
+          tooltip: 'File upload middleware for Express',
+        },
+      ],
+      python: [
+        {
+          value: 'python-multipart',
+          label: 'python-multipart',
+          tooltip: 'File upload handling for Python',
+        },
+        {
+          value: 'fastapi-upload',
+          label: 'fastapi-upload',
+          tooltip: 'File uploads for FastAPI',
+        },
+      ],
+    },
+    testing: {
+      nodejs: [
+        {
+          value: 'jest',
+          label: 'Jest',
+          tooltip: 'JavaScript testing framework',
+        },
+        {
+          value: 'supertest',
+          label: 'Supertest',
+          tooltip: 'HTTP assertions for Node.js',
+        },
+        {
+          value: 'mocha',
+          label: 'Mocha',
+          tooltip: 'Flexible JavaScript test framework',
+        },
+        {
+          value: 'chai',
+          label: 'Chai',
+          tooltip: 'Assertion library for Node.js',
+        },
+      ],
+      python: [
+        {
+          value: 'pytest',
+          label: 'pytest',
+          tooltip: 'Python testing framework',
+        },
+        {
+          value: 'unittest',
+          label: 'unittest',
+          tooltip: 'Built-in Python testing framework',
+        },
+      ],
+    },
+    apiDocs: {
+      nodejs: [
+        {
+          value: 'swagger-jsdoc',
+          label: 'swagger-jsdoc',
+          tooltip: 'Swagger documentation for Node.js',
+        },
+        {
+          value: 'swagger-ui-express',
+          label: 'swagger-ui-express',
+          tooltip: 'Swagger UI for Express',
+        },
+      ],
+      python: [
+        {
+          value: 'fastapi-swagger-ui',
+          label: 'fastapi-swagger-ui',
+          tooltip: 'Swagger UI for FastAPI',
+        },
+        {
+          value: 'apispec',
+          label: 'apispec',
+          tooltip: 'API specification for Python',
+        },
+      ],
+    },
+    rateLimit: {
+      nodejs: [
+        {
+          value: 'helmet',
+          label: 'helmet',
+          tooltip: 'Security middleware for Express',
+        },
+        {
+          value: 'express-rate-limit',
+          label: 'express-rate-limit',
+          tooltip: 'Rate limiting for Express',
+        },
+      ],
+      python: [
+        {
+          value: 'slowapi',
+          label: 'slowapi',
+          tooltip: 'Rate limiting for FastAPI',
+        },
+        {
+          value: 'limits',
+          label: 'limits',
+          tooltip: 'Rate limiting library for Python',
+        },
+      ],
+    },
+    scheduler: {
+      nodejs: [
+        {
+          value: 'node-cron',
+          label: 'node-cron',
+          tooltip: 'Cron jobs for Node.js',
+        },
+        {
+          value: 'agenda',
+          label: 'agenda',
+          tooltip: 'Job scheduling for Node.js',
+        },
+      ],
+      python: [
+        {
+          value: 'apscheduler',
+          label: 'apscheduler',
+          tooltip: 'Scheduling library for Python',
+        },
+        {
+          value: 'celery',
+          label: 'celery',
+          tooltip: 'Distributed task queue for Python',
+        },
+      ],
+    },
+    emailing: {
+      nodejs: [
+        {
+          value: 'nodemailer',
+          label: 'nodemailer',
+          tooltip: 'Email sending for Node.js',
+        },
+      ],
+      python: [
+        {
+          value: 'smtplib',
+          label: 'smtplib',
+          tooltip: 'Built-in Python email library',
+        },
+        {
+          value: 'flask-mail',
+          label: 'flask-mail',
+          tooltip: 'Email sending for Flask',
+        },
+      ],
+    },
+  };
+
+  // Reset dependent dropdowns when language changes
+  useEffect(() => {
+    setWebFramework('');
+    setOrm('');
+    setDbDriver('');
+    setValidation('');
+    setAuth('');
+    setEnvVars('');
+    setReqHandling('');
+    setCorsLib('');
+    setLogging('');
+    setFileUploads('');
+    setTesting('');
+    setApiDocs('');
+    setRateLimit('');
+    setScheduler('');
+    setEmailing('');
+  }, [language]);
+
+  return (
+    <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50'>
+      <div className='bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-4xl mx-4 max-h-[80vh] overflow-y-auto'>
+        <div className='flex items-center justify-between mb-4'>
+          <h2 className='text-lg font-semibold text-white'>Configuration</h2>
+          <button
+            onClick={onClose}
+            className='text-gray-400 hover:text-gray-200'
+          >
+            <X className='w-4 h-4' />
+          </button>
+        </div>
+        <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4'>
+          <div className='relative group'>
+            <label className='block text-xs font-medium text-gray-300 mb-1 capitalize'>
+              Language
+            </label>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className='w-full p-1.5 text-xs bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-blue-500'
+            >
+              <option value=''>Select Language</option>
+              {libraryOptions.language.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <div className='absolute hidden group-hover:block bg-gray-600 text-white text-xs rounded p-2 mt-1 z-10 max-w-xs'>
+              {libraryOptions.language.find((opt) => opt.value === language)
+                ?.tooltip || 'Select a programming language.'}
+            </div>
+          </div>
+          {Object.keys(libraryOptions)
+            .filter((key) => key !== 'language')
+            .map((key) => (
+              <div key={key} className='relative group'>
+                <label className='block text-xs font-medium text-gray-300 mb-1 capitalize'>
+                  {key.replace(/([A-Z])/g, ' $1')}
+                </label>
+                <select
+                  value={eval(key)}
+                  onChange={(e) =>
+                    eval(`set${key.charAt(0).toUpperCase() + key.slice(1)}`)(
+                      e.target.value
+                    )
+                  }
+                  className='w-full p-1.5 text-xs bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-blue-500'
+                  disabled={!language}
+                >
+                  <option value=''>
+                    Select {key.replace(/([A-Z])/g, ' $1')}
+                  </option>
+                  {language &&
+                    libraryOptions[key][language].map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                </select>
+                <div className='absolute hidden group-hover:block bg-gray-600 text-white text-xs rounded p-2 mt-1 z-10 max-w-xs'>
+                  {(language &&
+                    libraryOptions[key][language].find(
+                      (opt) => opt.value === eval(key)
+                    )?.tooltip) ||
+                    `Select a ${key.replace(/([A-Z])/g, ' $1')} library.`}
+                </div>
+              </div>
+            ))}
+        </div>
+        <div className='mt-6'>
+          <button
+            onClick={() => {
+              onGenerate();
+              onClose();
+            }}
+            disabled={isLoading || !webFramework}
+            className='w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-xs transition-colors'
+          >
+            <Play className='w-4 h-4' />
+            {isLoading ? 'Generating...' : 'Generate Backend'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+function CodeEditor() {
   const initialSqlQuery = `CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) NOT NULL UNIQUE,
@@ -170,7 +843,6 @@ function App() {
   const [loadingBackend, setLoadingBackend] = useState(false);
   const [error, setError] = useState('');
   const [streamOutput, setStreamOutput] = useState('');
-  const [isDarkTheme, setIsDarkTheme] = useState(true);
   const [language, setLanguage] = useState('nodejs');
   const [webFramework, setWebFramework] = useState('');
   const [orm, setOrm] = useState('');
@@ -187,6 +859,7 @@ function App() {
   const [rateLimit, setRateLimit] = useState('');
   const [scheduler, setScheduler] = useState('');
   const [emailing, setEmailing] = useState('');
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
   const streamRef = useRef(null);
 
   const activeGeneratedFile = generatedFiles.find(
@@ -198,70 +871,6 @@ function App() {
   const currentGeneratedCodeLanguage = activeGeneratedFile
     ? activeGeneratedFile.language
     : 'javascript';
-
-  // Library options filtered by language
-  const libraryOptions = {
-    webFramework: {
-      nodejs: ['express', 'fastify'],
-      python: ['django', 'fastapi'],
-    },
-    orm: {
-      nodejs: ['prisma', 'sequelize', 'knex'],
-      python: ['sqlalchemy', 'tortoise-orm'],
-    },
-    dbDriver: {
-      nodejs: ['pg', 'mysql2'],
-      python: ['psycopg2', 'mysqlclient', 'pymysql'],
-    },
-    validation: {
-      nodejs: ['zod', 'joi', 'yup'],
-      python: ['pydantic', 'wtforms'],
-    },
-    auth: {
-      nodejs: ['jsonwebtoken', 'bcrypt'],
-      python: ['pyjwt', 'oauthlib'],
-    },
-    envVars: {
-      nodejs: ['dotenv'],
-      python: ['python-decouple', 'environs'],
-    },
-    reqHandling: {
-      nodejs: ['express.json', 'body-parser'],
-      python: ['fastapi', 'starlette'],
-    },
-    corsLib: {
-      nodejs: ['cors'],
-      python: ['fastapi-cors', 'starlette-cors'],
-    },
-    logging: {
-      nodejs: ['morgan', 'winston', 'pino'],
-      python: ['python-logging', 'loguru'],
-    },
-    fileUploads: {
-      nodejs: ['multer'],
-      python: ['python-multipart', 'fastapi-upload'],
-    },
-    testing: {
-      nodejs: ['jest', 'supertest', 'mocha', 'chai'],
-      python: ['pytest', 'unittest'],
-    },
-    apiDocs: {
-      nodejs: ['swagger-jsdoc', 'swagger-ui-express'],
-      python: ['fastapi-swagger-ui', 'apispec'],
-    },
-    rateLimit: {
-      nodejs: ['helmet', 'express-rate-limit'],
-      python: ['slowapi', 'limits'],
-    },
-    scheduler: {
-      nodejs: ['node-cron', 'agenda'],
-      python: ['apscheduler', 'celery'],
-    },
-    emailing: {
-      nodejs: ['nodemailer'],
-      python: ['smtplib', 'flask-mail'],
-    },
-  };
 
   const simulateEventStream = async (apiResponseText) => {
     setStreamOutput('');
@@ -280,8 +889,7 @@ function App() {
     setActiveGeneratedFileId(null);
     setStreamOutput('');
 
-    let prompt = `Generate a complete backend application for the following SQL schema in ${language}.
-    `;
+    let prompt = `Generate a complete backend application for the following SQL schema in ${language}. `;
     if (language === 'nodejs' && webFramework) {
       prompt += `Use ${webFramework} as the web framework`;
       if (orm) prompt += `, ${orm} as the ORM/query builder`;
@@ -314,7 +922,7 @@ function App() {
 
       For each table in the SQL schema, create corresponding model, controller, and route files with standard CRUD operations (create, read, update, delete).
       Use parameterized queries appropriate to the database driver (e.g., ? for mysql2, $1 for pg).
-      Include a 404 Not Found middleware and define product and user routes.
+      Include a  Displaying 404 Not Found middleware and define product and user routes.
       Ensure proper error handling and modularity. Do not include outline comments or descriptions; provide only the actual file contents.
       Return only the code for each file, prefixed with '// ' followed by the file path.
       `;
@@ -429,10 +1037,8 @@ function App() {
       ?.writeText(text)
       .then(() => {
         const messageBox = document.createElement('div');
-        messageBox.textContent = 'Code copied to clipboard!';
-        messageBox.className = `fixed bottom-4 right-4 bg-${
-          isDarkTheme ? 'green-600' : 'green-500'
-        } text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in`;
+        messageBox.textContent = 'Copied to clipboard!';
+        messageBox.className = `fixed bottom-4 right-4 bg-green-600 text-white px-3 py-2 rounded-lg shadow-lg z-50`;
         document.body.appendChild(messageBox);
         setTimeout(() => document.body.removeChild(messageBox), 2000);
       })
@@ -444,552 +1050,334 @@ function App() {
         document.execCommand('copy');
         document.body.removeChild(textArea);
         const messageBox = document.createElement('div');
-        messageBox.textContent = 'Code copied to clipboard!';
-        messageBox.className = `fixed bottom-4 right-4 bg-${
-          isDarkTheme ? 'green-600' : 'green-500'
-        } text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in`;
+        messageBox.textContent = 'Copied to clipboard!';
+        messageBox.className = `fixed bottom-4 right-4 bg-green-600 text-white px-3 py-2 rounded-lg shadow-lg z-50`;
         document.body.appendChild(messageBox);
         setTimeout(() => document.body.removeChild(messageBox), 2000);
       });
   };
 
+  const copyFilePath = (path) => {
+    copyToClipboard(path);
+  };
+
+  const downloadAsZip = () => {
+    const zip = new JSZip();
+    generatedFiles.forEach((file) => {
+      zip.file(file.path, file.content);
+    });
+    zip.generateAsync({ type: 'blob' }).then((content) => {
+      saveAs(content, 'generated-backend.zip');
+    });
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.ctrlKey && e.key === 's') {
+      e.preventDefault();
+      copyToClipboard(currentGeneratedCode);
+    }
+  };
+
+  const getFileIcon = (fileName) => {
+    const ext = fileName.split('.').pop().toLowerCase();
+    const iconStyle = 'w-3 h-3 mr-2';
+
+    switch (ext) {
+      case 'js':
+        return (
+          <div
+            className={`${iconStyle} bg-yellow-500 rounded-sm flex items-center justify-center text-[10px] font-bold text-black`}
+          >
+            JS
+          </div>
+        );
+      case 'py':
+        return (
+          <div
+            className={`${iconStyle} bg-blue-500 rounded-sm flex items-center justify-center text-[10px] font-bold text-white`}
+          >
+            PY
+          </div>
+        );
+      case 'json':
+        return (
+          <div
+            className={`${iconStyle} bg-orange-400 rounded-sm flex items-center justify-center text-[10px] font-bold text-black`}
+          >
+            {}
+          </div>
+        );
+      case 'sql':
+        return (
+          <div
+            className={`${iconStyle} bg-purple-500 rounded-sm flex items-center justify-center text-[10px] font-bold text-white`}
+          >
+            SQL
+          </div>
+        );
+      case 'md':
+        return (
+          <div
+            className={`${iconStyle} bg-gray-400 rounded-sm flex items-center justify-center text-[10px] font-bold text-black`}
+          >
+            MD
+          </div>
+        );
+      case 'env':
+        return (
+          <div
+            className={`${iconStyle} bg-green-500 rounded-sm flex items-center justify-center text-[10px] font-bold text-white`}
+          >
+            .ENV
+          </div>
+        );
+      default:
+        return <File className={iconStyle} />;
+    }
+  };
+
   return (
-    <div
-      className={`min-h-screen flex flex-col items-center p-6 ${
-        isDarkTheme ? 'bg-gray-900 text-gray-200' : 'bg-white text-gray-800'
-      }`}
-    >
-      <div className='w-full max-w-7xl rounded-xl shadow-2xl p-8'>
-        <div className='flex justify-between items-center mb-8'>
-          <h1
-            className={`text-4xl font-bold text-center ${
-              isDarkTheme ? 'text-blue-400' : 'text-blue-600'
-            }`}
-          >
-            AI-Powered Backend Generator
-          </h1>
+    <div className='h-screen flex flex-col bg-gray-900 text-gray-200 font-mono text-xs'>
+      {/* Header */}
+      <div className='h-8 bg-gray-800 border-b border-gray-700 flex items-center px-3'>
+        <div className='flex items-center space-x-2'>
+          <div className='w-2 h-2 bg-red-500 rounded-full'></div>
+          <div className='w-2 h-2 bg-yellow-500 rounded-full'></div>
+          <div className='w-2 h-2 bg-green-500 rounded-full'></div>
+        </div>
+        <div className='flex-1 text-center text-xs text-gray-400'>
+          AI-Powered Backend Generator
+        </div>
+        <div className='flex items-center space-x-2'>
           <button
-            onClick={() => setIsDarkTheme(!isDarkTheme)}
-            className={`px-4 py-2 rounded-lg ${
-              isDarkTheme
-                ? 'bg-gray-700 text-white hover:bg-gray-600'
-                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-            }`}
+            onClick={() => setIsConfigOpen(true)}
+            className='p-1 text-gray-400 hover:text-gray-200'
+            title='Configuration'
           >
-            Toggle Theme
+            <Settings className='w-4 h-4' />
+          </button>
+          <button
+            onClick={downloadAsZip}
+            disabled={generatedFiles.length === 0}
+            className='p-1 text-gray-400 hover:text-gray-200 disabled:opacity-50'
+            title='Download as ZIP'
+          >
+            <Download className='w-4 h-4' />
           </button>
         </div>
+      </div>
 
-        {error && (
-          <div
-            className={`px-6 py-4 rounded-lg mb-6 ${
-              isDarkTheme
-                ? 'bg-red-900/50 border border-red-700 text-red-300 animate-pulse'
-                : 'bg-red-100 border border-red-400 text-red-700'
-            }`}
-          >
-            <strong className='font-bold'>Error!</strong>
-            <span className='ml-2'>{error}</span>
+      {/* Error Banner */}
+      {error && (
+        <div className='bg-red-900/50 border-b border-red-700 px-3 py-2 text-red-300 text-xs'>
+          {error}
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className='flex-1 flex overflow-hidden'>
+        {/* Sidebar: File Tree */}
+        <div className='w-64 bg-gray-800 border-r border-gray-700 flex flex-col'>
+          <div className='h-8 bg-gray-800 border-b border-gray-700 flex items-center px-3'>
+            <span className='text-xs font-medium text-gray-400 uppercase tracking-wide'>
+              Explorer
+            </span>
           </div>
-        )}
+          <FileTree
+            files={generatedFiles}
+            activeFileId={activeGeneratedFileId}
+            onFileSelect={setActiveGeneratedFileId}
+            onCopyPath={copyFilePath}
+          />
+        </div>
 
-        <div className='grid grid-cols-1 lg:grid-cols-2 gap-8'>
-          {/* Configuration Panel */}
-          <div>
-            <h2
-              className={`text-2xl font-semibold mb-4 ${
-                isDarkTheme ? 'text-blue-300' : 'text-blue-600'
-              }`}
-            >
-              Configuration
-            </h2>
-            <div
-              className={`border rounded-lg p-4 ${
-                isDarkTheme
-                  ? 'bg-gray-800 border-gray-700'
-                  : 'bg-gray-100 border-gray-300'
-              }`}
-            >
-              <div className='mb-4'>
-                <label className='block mb-2'>Language</label>
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value='nodejs'>Node.js</option>
-                  <option value='python'>Python</option>
-                </select>
+        {/* Editor Area */}
+        <div className='flex-1 flex flex-col'>
+          {/* Editors */}
+          <div className='flex-1 flex flex-col md:flex-row min-h-0'>
+            {/* SQL Editor */}
+            <div className='flex-1 flex flex-col border-r border-gray-700 min-h-0'>
+              <div className='h-8 bg-gray-800 border-b border-gray-700 flex items-center px-3'>
+                <div className='w-3 h-3 bg-purple-500 rounded-sm mr-2'></div>
+                <span className='text-xs text-gray-300'>schema.sql</span>
               </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>Web Framework</label>
-                <select
-                  value={webFramework}
-                  onChange={(e) => setWebFramework(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select a framework</option>
-                  {libraryOptions.webFramework[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>ORM/Query Builder</label>
-                <select
-                  value={orm}
-                  onChange={(e) => setOrm(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select an ORM</option>
-                  {libraryOptions.orm[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>Database Driver</label>
-                <select
-                  value={dbDriver}
-                  onChange={(e) => setDbDriver(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select a driver</option>
-                  {libraryOptions.dbDriver[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}{' '}
-                      {language === 'nodejs' && option === 'pg'
-                        ? '(PostgreSQL)'
-                        : language === 'nodejs' && option === 'mysql2'
-                        ? '(MySQL)'
-                        : language === 'python' && option === 'psycopg2'
-                        ? '(PostgreSQL)'
-                        : '(MySQL)'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>Validation</label>
-                <select
-                  value={validation}
-                  onChange={(e) => setValidation(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select validation</option>
-                  {libraryOptions.validation[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>Authentication</label>
-                <select
-                  value={auth}
-                  onChange={(e) => setAuth(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select authentication</option>
-                  {libraryOptions.auth[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>Environment Variables</label>
-                <select
-                  value={envVars}
-                  onChange={(e) => setEnvVars(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select env vars</option>
-                  {libraryOptions.envVars[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>Request Handling</label>
-                <select
-                  value={reqHandling}
-                  onChange={(e) => setReqHandling(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select request handling</option>
-                  {libraryOptions.reqHandling[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>CORS</label>
-                <select
-                  value={corsLib}
-                  onChange={(e) => setCorsLib(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select CORS</option>
-                  {libraryOptions.corsLib[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>Logging</label>
-                <select
-                  value={logging}
-                  onChange={(e) => setLogging(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select logging</option>
-                  {libraryOptions.logging[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>File Uploads</label>
-                <select
-                  value={fileUploads}
-                  onChange={(e) => setFileUploads(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select file uploads</option>
-                  {libraryOptions.fileUploads[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>Testing</label>
-                <select
-                  value={testing}
-                  onChange={(e) => setTesting(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select testing</option>
-                  {libraryOptions.testing[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>API Docs</label>
-                <select
-                  value={apiDocs}
-                  onChange={(e) => setApiDocs(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select API docs</option>
-                  {libraryOptions.apiDocs[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>Rate Limiting/Security</label>
-                <select
-                  value={rateLimit}
-                  onChange={(e) => setRateLimit(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select rate limit</option>
-                  {libraryOptions.rateLimit[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>Scheduler</label>
-                <select
-                  value={scheduler}
-                  onChange={(e) => setScheduler(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select scheduler</option>
-                  {libraryOptions.scheduler[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='mb-4'>
-                <label className='block mb-2'>Emailing</label>
-                <select
-                  value={emailing}
-                  onChange={(e) => setEmailing(e.target.value)}
-                  className='w-full p-2 rounded bg-gray-200 text-gray-800'
-                >
-                  <option value=''>Select emailing</option>
-                  {libraryOptions.emailing[language].map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                onClick={generateBackendCode}
-                className={`w-full px-4 py-2 mt-4 rounded-lg ${
-                  isDarkTheme
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'bg-blue-500 text-white hover:bg-blue-600'
-                } transition-all duration-300 ${
-                  loadingBackend || !sqlQuery.trim() || !webFramework
-                    ? 'opacity-50 cursor-not-allowed'
-                    : ''
-                }`}
-                disabled={loadingBackend || !sqlQuery.trim() || !webFramework}
-              >
-                {loadingBackend ? (
-                  <span className='flex items-center justify-center'>
-                    <svg
-                      className='animate-spin mr-3 h-5 w-5 text-white'
-                      fill='none'
-                      viewBox='0 0 24 24'
-                    >
-                      <circle
-                        className='opacity-25'
-                        cx='12'
-                        cy='12'
-                        r='10'
-                        stroke='currentColor'
-                        strokeWidth='4'
-                      />
-                      <path
-                        className='opacity-75'
-                        fill='currentColor'
-                        d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                      />
-                    </svg>
-                    Generating...
-                  </span>
-                ) : (
-                  'Generate Backend Code'
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* SQL Query Editor and Generated Code Section */}
-          <div className='flex flex-col'>
-            <h2
-              className={`text-2xl font-semibold mb-4 ${
-                isDarkTheme ? 'text-blue-300' : 'text-blue-600'
-              }`}
-            >
-              SQL Schema Input & Generated Code
-            </h2>
-            <div
-              className={`flex-1 border rounded-lg overflow-hidden ${
-                isDarkTheme
-                  ? 'bg-gray-800 border-gray-700'
-                  : 'bg-gray-100 border-gray-300'
-              }`}
-            >
-              {/* SQL Query Editor */}
-              <div className='p-4 border-b'>
+              <div className='flex-1 overflow-x-auto overflow-y-auto bg-gray-850 min-w-0 min-h-0 max-h-[calc(100vh-4rem)]'>
                 <Editor
                   value={sqlQuery}
                   onValueChange={setSqlQuery}
                   highlight={(code) =>
                     Prism.highlight(code, Prism.languages.sql, 'sql')
                   }
-                  padding={16}
-                  className={`font-mono text-sm min-h-[200px] ${
-                    isDarkTheme
-                      ? 'bg-gray-800 text-gray-200'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
-                  style={{ fontFamily: '"Fira Code", monospace', fontSize: 14 }}
+                  padding={10}
+                  className='h-full font-mono text-xs bg-gray-850 text-gray-200 whitespace-pre min-h-0 overflow-y-auto'
+                  style={{
+                    fontFamily: '"Fira Code", "Consolas", monospace',
+                    fontSize: 12,
+                    height: '100%',
+                    overflow: 'auto',
+                  }}
+                  textareaClassName='focus:outline-none resize-none overflow-y-auto'
+                  onKeyDown={handleKeyDown}
                 />
               </div>
-              {/* File Tree and Code Editor Area */}
-              <div className='flex'>
-                <div
-                  className={`w-1/3 ${
-                    isDarkTheme
-                      ? 'bg-gray-850 border-r border-gray-700'
-                      : 'bg-white border-r border-gray-300'
-                  } overflow-y-auto`}
-                >
-                  <h3
-                    className={`text-lg font-medium p-4 border-b ${
-                      isDarkTheme
-                        ? 'text-gray-300 border-gray-700'
-                        : 'text-gray-700 border-gray-300'
-                    }`}
-                  >
-                    Project Structure
-                  </h3>
-                  {generatedFiles.length > 0 ? (
-                    <FileTree
-                      files={generatedFiles}
-                      activeFileId={activeGeneratedFileId}
-                      onFileSelect={setActiveGeneratedFileId}
-                    />
-                  ) : (
-                    <p
-                      className={`text-sm p-4 ${
-                        isDarkTheme ? 'text-gray-400' : 'text-gray-500'
-                      }`}
-                    >
-                      Generate code to view project structure.
-                    </p>
-                  )}
-                </div>
-                <div className='flex-1 flex flex-col'>
-                  <div
-                    className={`flex items-center justify-between ${
-                      isDarkTheme
-                        ? 'bg-gray-850 border-b border-gray-700'
-                        : 'bg-white border-b border-gray-300'
-                    } px-4 py-3`}
-                  >
-                    <span
-                      className={`text-sm font-medium ${
-                        isDarkTheme ? 'text-gray-300' : 'text-gray-700'
-                      }`}
-                    >
-                      {activeGeneratedFile
-                        ? activeGeneratedFile.path
-                        : 'Select a file'}
+            </div>
+
+            {/* Code Editor */}
+            <div className='flex-1 flex flex-col min-h-0'>
+              <div className='h-8 bg-gray-800 border-b border-gray-700 flex items-center px-3'>
+                {activeGeneratedFile ? (
+                  <div className='flex items-center'>
+                    {getFileIcon(activeGeneratedFile.name)}
+                    <span className='text-xs text-gray-300'>
+                      {activeGeneratedFile.name}
                     </span>
-                    <button
-                      onClick={() => copyToClipboard(currentGeneratedCode)}
-                      className={`px-4 py-2 rounded-lg ${
-                        isDarkTheme
-                          ? 'bg-blue-600 text-white hover:bg-blue-700'
-                          : 'bg-blue-500 text-white hover:bg-blue-600'
-                      } text-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed`}
-                      disabled={!currentGeneratedCode}
-                    >
-                      Copy Code
-                    </button>
                   </div>
-                  <div className='flex-1 overflow-auto p-4'>
-                    <Editor
-                      value={currentGeneratedCode}
-                      onValueChange={(code) =>
-                        setGeneratedFiles((prevFiles) =>
-                          prevFiles.map((file) =>
-                            file.id === activeGeneratedFileId
-                              ? { ...file, content: code }
-                              : file
-                          )
+                ) : (
+                  <span className='text-xs text-gray-400'>Select a file</span>
+                )}
+                <div className='flex-1' />
+                <button
+                  onClick={() => copyToClipboard(currentGeneratedCode)}
+                  disabled={!currentGeneratedCode}
+                  className='p-1 text-gray-400 hover:text-gray-200 disabled:opacity-50'
+                  title='Copy Code (Ctrl+S)'
+                >
+                  <Copy className='w-4 h-4' />
+                </button>
+              </div>
+              <div className='flex-1 overflow-x-auto overflow-y-auto bg-gray-850 min-w-0 min-h-0 max-h-[calc(100vh-4rem)]'>
+                {activeGeneratedFile ? (
+                  <Editor
+                    value={currentGeneratedCode}
+                    onValueChange={(code) =>
+                      setGeneratedFiles((prevFiles) =>
+                        prevFiles.map((file) =>
+                          file.id === activeGeneratedFileId
+                            ? { ...file, content: code }
+                            : file
                         )
-                      }
-                      highlight={(code) => {
-                        const grammar =
-                          Prism.languages[currentGeneratedCodeLanguage] ||
-                          (language === 'python'
-                            ? Prism.languages.python
-                            : Prism.languages.javascript);
-                        return Prism.highlight(
-                          code,
-                          grammar,
-                          currentGeneratedCodeLanguage
-                        );
-                      }}
-                      padding={16}
-                      className={`font-mono text-sm w-full ${
-                        isDarkTheme
-                          ? 'bg-gray-800 text-gray-200'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                      style={{
-                        fontFamily: '"Fira Code", monospace',
-                        fontSize: 14,
-                      }}
-                    />
+                      )
+                    }
+                    highlight={(code) => {
+                      const grammar =
+                        Prism.languages[currentGeneratedCodeLanguage] ||
+                        (language === 'python'
+                          ? Prism.languages.python
+                          : Prism.languages.javascript);
+                      return Prism.highlight(
+                        code,
+                        grammar,
+                        currentGeneratedCodeLanguage
+                      );
+                    }}
+                    padding={10}
+                    className='h-full font-mono text-xs bg-gray-850 text-gray-200 whitespace-pre min-h-0 overflow-y-auto'
+                    style={{
+                      fontFamily: '"Fira Code", "Consolas", monospace',
+                      fontSize: 12,
+                      height: '100%',
+                      overflow: 'auto',
+                    }}
+                    textareaClassName='focus:outline-none resize-none overflow-y-auto'
+                    onKeyDown={handleKeyDown}
+                  />
+                ) : (
+                  <div className='flex items-center justify-center h-full text-gray-400'>
+                    <div className='text-center'>
+                      <File className='w-12 h-12 mx-auto mb-2 opacity-50' />
+                      <p className='text-xs'>No file selected</p>
+                      <p className='text-xs'>
+                        Choose a file from the explorer or generate new code
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Streaming Output */}
-        {loadingBackend && (
-          <div
-            className={`mt-6 rounded-lg p-6 ${
-              isDarkTheme ? 'bg-gray-800' : 'bg-gray-100'
-            }`}
-          >
-            <h3
-              className={`text-lg font-medium mb-4 ${
-                isDarkTheme ? 'text-blue-300' : 'text-blue-600'
-              }`}
-            >
-              Generation Progress
-            </h3>
-            <pre
-              className={`text-sm font-mono p-4 rounded-lg max-h-48 overflow-y-auto ${
-                isDarkTheme
-                  ? 'bg-gray-900 text-gray-300'
-                  : 'bg-gray-200 text-gray-800'
-              }`}
-            >
-              {streamOutput || 'Initializing code generation...'}
+      {/* Streaming Output */}
+      {loadingBackend && (
+        <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50'>
+          <div className='bg-gray-800 rounded-lg p-4 text-center'>
+            <div className='animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3'></div>
+            <p className='text-xs text-gray-300'>Generating backend code...</p>
+            <pre className='text-xs font-mono p-2 mt-2 rounded bg-gray-850 text-gray-300 max-h-32 overflow-y-auto'>
+              {streamOutput || 'Initializing...'}
             </pre>
           </div>
-        )}
-
-        <div
-          className={`mt-8 text-center text-sm ${
-            isDarkTheme ? 'text-gray-400' : 'text-gray-600'
-          }`}
-        >
-          <p>
-            **Security Note:** For production, store your Gemini API key
-            securely on a backend server or use serverless functions.
-          </p>
-          {generatedFiles.some(
-            (file) =>
-              file.name === 'app.js' ||
-              file.name === 'manage.py' ||
-              file.name === 'main.py'
-          ) && (
-            <p className='mt-2'>
-              **Run Command:**{' '}
-              <code>
-                {language === 'nodejs'
-                  ? 'npm start'
-                  : webFramework === 'django'
-                  ? 'python manage.py runserver'
-                  : 'uvicorn main:app --reload'}
-              </code>
-            </p>
-          )}
         </div>
+      )}
+
+      {/* Configuration Modal */}
+      {isConfigOpen && (
+        <ConfigModal
+          language={language}
+          setLanguage={setLanguage}
+          webFramework={webFramework}
+          setWebFramework={setWebFramework}
+          orm={orm}
+          setOrm={setOrm}
+          dbDriver={dbDriver}
+          setDbDriver={setDbDriver}
+          validation={validation}
+          setValidation={setValidation}
+          auth={auth}
+          setAuth={setAuth}
+          envVars={envVars}
+          setEnvVars={setEnvVars}
+          reqHandling={reqHandling}
+          setReqHandling={setReqHandling}
+          corsLib={corsLib}
+          setCorsLib={setCorsLib}
+          logging={logging}
+          setLogging={setLogging}
+          fileUploads={fileUploads}
+          setFileUploads={setFileUploads}
+          testing={testing}
+          setTesting={setTesting}
+          apiDocs={apiDocs}
+          setApiDocs={setApiDocs}
+          rateLimit={rateLimit}
+          setRateLimit={setRateLimit}
+          scheduler={scheduler}
+          setScheduler={setScheduler}
+          emailing={emailing}
+          setEmailing={setEmailing}
+          onGenerate={generateBackendCode}
+          isLoading={loadingBackend}
+          onClose={() => setIsConfigOpen(false)}
+        />
+      )}
+
+      {/* Footer */}
+      <div className='h-8 bg-gray-800 border-t border-gray-700 flex items-center px-3 text-xs text-gray-400'>
+        <p>
+          **Security Note:** For production, store your Gemini API key securely
+          on a backend server or use serverless functions.
+        </p>
+        {generatedFiles.some(
+          (file) =>
+            file.name === 'app.js' ||
+            file.name === 'manage.py' ||
+            file.name === 'main.py'
+        ) && (
+          <p className='ml-auto'>
+            **Run Command:**{' '}
+            <code>
+              {language === 'nodejs'
+                ? 'npm start'
+                : webFramework === 'django'
+                ? 'python manage.py runserver'
+                : 'uvicorn main:app --reload'}
+            </code>
+          </p>
+        )}
       </div>
     </div>
   );
 }
 
-export default App;
+export default CodeEditor;
