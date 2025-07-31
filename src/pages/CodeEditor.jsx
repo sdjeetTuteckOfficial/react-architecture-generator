@@ -19,30 +19,47 @@ import {
 // Helper function to parse the generated markdown into a file structure
 const parseGeneratedCode = (markdownText) => {
   const files = [];
+  // Regex to find lines starting with // or # followed by a path, then capture content until the next such line or end of string
   const fileRegex = /^(?:\/\/|#)\s*([^\n]+)\n([\s\S]*?)(?=(?:^\/\/|^#|\Z))/gm;
   let match;
 
   while ((match = fileRegex.exec(markdownText)) !== null) {
     const fullPath = match[1].trim();
+    // Skip lines that look like comments or descriptions, not file paths
     if (fullPath.match(/^\w+\s+\w+/)) continue;
     let content = match[2].trim();
-    if (!content) continue;
+    if (!content) continue; // Skip if no content
+
+    // Remove markdown code block fences if they exist
     content = content.replace(
       /```(?:javascript|python|json|sql|markdown)?\n|\n```/g,
       ''
     );
+
     const pathParts = fullPath.split('/');
     const fileName = pathParts.pop();
     const fileExtension = fileName.split('.').pop();
 
-    let language = 'javascript';
-    if (fileExtension === 'json') language = 'json';
+    let language = 'plaintext'; // Default language
+
+    // Determine language based on file extension
+    if (fileExtension === 'js' || fileExtension === 'jsx')
+      language = 'javascript';
+    else if (fileExtension === 'py') language = 'python';
+    else if (fileExtension === 'json') language = 'json';
     else if (fileExtension === 'sql') language = 'sql';
     else if (fileExtension === 'md') language = 'markdown';
-    else if (fileExtension === 'py') language = 'python';
+    else if (fileExtension === 'html') language = 'html';
+    else if (fileExtension === 'css') language = 'css';
+    else if (fileExtension === 'ts' || fileExtension === 'tsx')
+      language = 'typescript';
+    else if (fileExtension === 'xml') language = 'xml';
+    else if (fileExtension === 'yml' || fileExtension === 'yaml')
+      language = 'yaml';
+    else if (fileExtension === 'env') language = 'ini'; // .env files often use INI-like syntax
 
     files.push({
-      id: fullPath,
+      id: fullPath, // Unique ID for the file
       path: fullPath,
       name: fileName,
       content: content,
@@ -58,30 +75,24 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
   const [expandedDirs, setExpandedDirs] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Build a tree structure from the flat list of files
   const tree = {};
-  const parentFiles = [];
-  const folderFiles = [];
-
   files.forEach((file) => {
     const parts = file.path.split('/');
     let current = tree;
-    if (parts.length === 1) {
-      parentFiles.push(file);
-    } else {
-      folderFiles.push(file);
-      parts.forEach((part, index) => {
-        if (index === parts.length - 1) {
-          current[part] = { ...file, type: 'file' };
-        } else {
-          if (!current[part]) {
-            current[part] = { type: 'directory', children: {} };
-          }
-          current = current[part].children;
+    parts.forEach((part, index) => {
+      if (index === parts.length - 1) {
+        current[part] = { ...file, type: 'file' };
+      } else {
+        if (!current[part]) {
+          current[part] = { type: 'directory', children: {} };
         }
-      });
-    }
+        current = current[part].children;
+      }
+    });
   });
 
+  // Toggle directory expansion
   const toggleDirectory = (path) => {
     setExpandedDirs((prev) => ({
       ...prev,
@@ -89,12 +100,14 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
     }));
   };
 
+  // Get file icon based on extension
   const getFileIcon = (fileName) => {
     const ext = fileName.split('.').pop().toLowerCase();
-    const iconStyle = 'w-3 h-3 mr-2';
+    const iconStyle = 'w-3 h-3 mr-2 flex-shrink-0'; // Added flex-shrink-0 to prevent icon from shrinking
 
     switch (ext) {
       case 'js':
+      case 'jsx':
         return (
           <div
             className={`${iconStyle} bg-yellow-500 rounded-sm flex items-center justify-center text-[10px] font-bold text-black`}
@@ -115,7 +128,7 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
           <div
             className={`${iconStyle} bg-orange-400 rounded-sm flex items-center justify-center text-[10px] font-bold text-black`}
           >
-            {}
+            {'{}'}
           </div>
         );
       case 'sql':
@@ -142,33 +155,68 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
             .ENV
           </div>
         );
+      case 'html':
+        return (
+          <div
+            className={`${iconStyle} bg-red-500 rounded-sm flex items-center justify-center text-[10px] font-bold text-white`}
+          >
+            HTML
+          </div>
+        );
+      case 'css':
+        return (
+          <div
+            className={`${iconStyle} bg-blue-400 rounded-sm flex items-center justify-center text-[10px] font-bold text-white`}
+          >
+            CSS
+          </div>
+        );
+      case 'ts':
+      case 'tsx':
+        return (
+          <div
+            className={`${iconStyle} bg-blue-600 rounded-sm flex items-center justify-center text-[10px] font-bold text-white`}
+          >
+            TS
+          </div>
+        );
       default:
         return <File className={iconStyle} />;
     }
   };
 
+  // Recursively render the file tree
   const renderTree = (node, path = '', depth = 0) => {
     const filteredEntries = Object.entries(node)
       .filter(([key, item]) => {
         if (item.type === 'file') {
           return key.toLowerCase().includes(searchTerm.toLowerCase());
         }
+        // If it's a directory, check if any of its children match the search term
+        if (item.type === 'directory') {
+          return (
+            JSON.stringify(item.children)
+              .toLowerCase()
+              .includes(searchTerm.toLowerCase()) ||
+            key.toLowerCase().includes(searchTerm.toLowerCase())
+          );
+        }
         return true;
       })
       .sort((a, b) => {
         const aIsDir = a[1].type === 'directory';
         const bIsDir = b[1].type === 'directory';
-        if (aIsDir && !bIsDir) return -1;
+        if (aIsDir && !bIsDir) return -1; // Directories first
         if (!aIsDir && bIsDir) return 1;
-        return a[0].localeCompare(b[0]);
+        return a[0].localeCompare(b[0]); // Then alphabetical
       });
 
     return filteredEntries.map(([key, item]) => {
       const currentPath = path ? `${path}/${key}` : key;
-      const paddingLeft = `${depth * 16 + 8}px`;
+      const paddingLeft = `${depth * 16 + 8}px`; // Indentation for depth
 
       if (item.type === 'directory') {
-        const isExpanded = expandedDirs[currentPath] !== false;
+        const isExpanded = expandedDirs[currentPath] !== false; // Default to expanded
         return (
           <div key={currentPath}>
             <div
@@ -215,12 +263,24 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
     });
   };
 
+  // Auto-expand all directories by default when files change
   useEffect(() => {
-    setExpandedDirs({}); // Auto-expand all directories by default
-  }, [files]);
+    const allDirs = {};
+    const buildExpandedState = (node, path = '') => {
+      Object.entries(node).forEach(([key, item]) => {
+        const currentPath = path ? `${path}/${key}` : key;
+        if (item.type === 'directory') {
+          allDirs[currentPath] = true;
+          buildExpandedState(item.children, currentPath);
+        }
+      });
+    };
+    buildExpandedState(tree);
+    setExpandedDirs(allDirs);
+  }, [files]); // Dependency on files ensures re-evaluation when files list changes
 
   return (
-    <div className='flex flex-col h-full bg-gray-800'>
+    <div className='flex flex-col h-full bg-gray-800 rounded-lg shadow-lg overflow-hidden'>
       <div className='p-2 border-b border-gray-700'>
         <div className='relative'>
           <Search className='absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400' />
@@ -241,12 +301,12 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
           )}
         </div>
       </div>
-      <div className='flex-1 overflow-y-auto'>
+      <div className='flex-1 overflow-y-auto custom-scrollbar'>
         {files.length > 0 ? (
           renderTree(tree)
         ) : (
-          <p className='text-xs p-2 text-gray-400 font-mono text-center'>
-            No files to display
+          <p className='text-xs p-4 text-gray-400 font-mono text-center'>
+            No files to display. Generate a backend to see files.
           </p>
         )}
       </div>
@@ -292,6 +352,7 @@ const ConfigModal = ({
   isLoading,
   onClose,
 }) => {
+  // Define options for each library/feature
   const libraryOptions = {
     language: [
       {
@@ -726,19 +787,111 @@ const ConfigModal = ({
     setEmailing('');
   }, [language]);
 
+  // Function to get the current value of a state variable dynamically
+  const getDynamicValue = (key) => {
+    switch (key) {
+      case 'webFramework':
+        return webFramework;
+      case 'orm':
+        return orm;
+      case 'dbDriver':
+        return dbDriver;
+      case 'validation':
+        return validation;
+      case 'auth':
+        return auth;
+      case 'envVars':
+        return envVars;
+      case 'reqHandling':
+        return reqHandling;
+      case 'corsLib':
+        return corsLib;
+      case 'logging':
+        return logging;
+      case 'fileUploads':
+        return fileUploads;
+      case 'testing':
+        return testing;
+      case 'apiDocs':
+        return apiDocs;
+      case 'rateLimit':
+        return rateLimit;
+      case 'scheduler':
+        return scheduler;
+      case 'emailing':
+        return emailing;
+      default:
+        return '';
+    }
+  };
+
+  // Function to set the value of a state variable dynamically
+  const setDynamicValue = (key, value) => {
+    switch (key) {
+      case 'webFramework':
+        setWebFramework(value);
+        break;
+      case 'orm':
+        setOrm(value);
+        break;
+      case 'dbDriver':
+        setDbDriver(value);
+        break;
+      case 'validation':
+        setValidation(value);
+        break;
+      case 'auth':
+        setAuth(value);
+        break;
+      case 'envVars':
+        setEnvVars(value);
+        break;
+      case 'reqHandling':
+        setReqHandling(value);
+        break;
+      case 'corsLib':
+        setCorsLib(value);
+        break;
+      case 'logging':
+        setLogging(value);
+        break;
+      case 'fileUploads':
+        setFileUploads(value);
+        break;
+      case 'testing':
+        setTesting(value);
+        break;
+      case 'apiDocs':
+        setApiDocs(value);
+        break;
+      case 'rateLimit':
+        setRateLimit(value);
+        break;
+      case 'scheduler':
+        setScheduler(value);
+        break;
+      case 'emailing':
+        setEmailing(value);
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
-    <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50'>
-      <div className='bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-4xl mx-4 max-h-[80vh] overflow-y-auto'>
+    <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'>
+      <div className='bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-4xl mx-auto max-h-[90vh] overflow-y-auto custom-scrollbar'>
         <div className='flex items-center justify-between mb-4'>
           <h2 className='text-lg font-semibold text-white'>Configuration</h2>
           <button
             onClick={onClose}
             className='text-gray-400 hover:text-gray-200'
           >
-            <X className='w-4 h-4' />
+            <X className='w-5 h-5' />
           </button>
         </div>
         <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4'>
+          {/* Language selection */}
           <div className='relative group'>
             <label className='block text-xs font-medium text-gray-300 mb-1 capitalize'>
               Language
@@ -760,27 +913,27 @@ const ConfigModal = ({
                 ?.tooltip || 'Select a programming language.'}
             </div>
           </div>
+
+          {/* Dynamic dropdowns for other options */}
           {Object.keys(libraryOptions)
-            .filter((key) => key !== 'language')
+            .filter((key) => key !== 'language') // Exclude language, as it's handled separately
             .map((key) => (
               <div key={key} className='relative group'>
                 <label className='block text-xs font-medium text-gray-300 mb-1 capitalize'>
-                  {key.replace(/([A-Z])/g, ' $1')}
+                  {key.replace(/([A-Z])/g, ' $1')}{' '}
+                  {/* Add space before capital letters */}
                 </label>
                 <select
-                  value={eval(key)}
-                  onChange={(e) =>
-                    eval(`set${key.charAt(0).toUpperCase() + key.slice(1)}`)(
-                      e.target.value
-                    )
-                  }
+                  value={getDynamicValue(key)}
+                  onChange={(e) => setDynamicValue(key, e.target.value)}
                   className='w-full p-1.5 text-xs bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-blue-500'
-                  disabled={!language}
+                  disabled={!language || !libraryOptions[key][language]} // Disable if no language or no options for the language
                 >
                   <option value=''>
                     Select {key.replace(/([A-Z])/g, ' $1')}
                   </option>
                   {language &&
+                    libraryOptions[key][language] &&
                     libraryOptions[key][language].map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
@@ -789,8 +942,8 @@ const ConfigModal = ({
                 </select>
                 <div className='absolute hidden group-hover:block bg-gray-600 text-white text-xs rounded p-2 mt-1 z-10 max-w-xs'>
                   {(language &&
-                    libraryOptions[key][language].find(
-                      (opt) => opt.value === eval(key)
+                    libraryOptions[key][language]?.find(
+                      (opt) => opt.value === getDynamicValue(key)
                     )?.tooltip) ||
                     `Select a ${key.replace(/([A-Z])/g, ' $1')} library.`}
                 </div>
@@ -803,7 +956,7 @@ const ConfigModal = ({
               onGenerate();
               onClose();
             }}
-            disabled={isLoading || !webFramework}
+            disabled={isLoading || !webFramework} // Disable if loading or no web framework selected
             className='w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-xs transition-colors'
           >
             <Play className='w-4 h-4' />
@@ -815,7 +968,8 @@ const ConfigModal = ({
   );
 };
 
-function CodeEditor() {
+function App() {
+  // Initial SQL query for demonstration
   const initialSqlQuery = `CREATE TABLE customers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -835,7 +989,7 @@ function CodeEditor() {
   const [loadingBackend, setLoadingBackend] = useState(false);
   const [error, setError] = useState('');
   const [streamOutput, setStreamOutput] = useState('');
-  const [language, setLanguage] = useState('nodejs');
+  const [language, setLanguage] = useState('nodejs'); // Default language
   const [webFramework, setWebFramework] = useState('');
   const [orm, setOrm] = useState('');
   const [dbDriver, setDbDriver] = useState('');
@@ -851,9 +1005,10 @@ function CodeEditor() {
   const [rateLimit, setRateLimit] = useState('');
   const [scheduler, setScheduler] = useState('');
   const [emailing, setEmailing] = useState('');
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
-  const streamRef = useRef(null);
+  const [isConfigOpen, setIsConfigOpen] = useState(false); // State for config modal visibility
+  const streamRef = useRef(null); // Ref for scrolling stream output
 
+  // Find the currently active file for the Monaco Editor
   const activeGeneratedFile = generatedFiles.find(
     (file) => file.id === activeGeneratedFileId
   );
@@ -864,16 +1019,21 @@ function CodeEditor() {
     ? activeGeneratedFile.language
     : 'javascript';
 
+  // Simulate streaming output (for demonstration, not actual API streaming)
   const simulateEventStream = async (apiResponseText) => {
     setStreamOutput('');
     const chunks = apiResponseText.split('\n').filter((line) => line.trim());
     for (let i = 0; i < chunks.length; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 50)); // Simulate delay
       setStreamOutput((prev) => prev + chunks[i] + '\n');
+      if (streamRef.current) {
+        streamRef.current.scrollTop = streamRef.current.scrollHeight; // Auto-scroll
+      }
     }
     return apiResponseText;
   };
 
+  // Function to generate backend code using the LLM
   const generateBackendCode = async () => {
     setError('');
     setLoadingBackend(true);
@@ -890,7 +1050,9 @@ function CodeEditor() {
     }
 
     if (tables.length === 0) {
-      setError('No tables found in the SQL query.');
+      setError(
+        'No tables found in the SQL query. Please provide a valid SQL schema.'
+      );
       setLoadingBackend(false);
       return;
     }
@@ -905,15 +1067,16 @@ function CodeEditor() {
             : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
         )
         .replace(/_/g, '');
+
     const toSnakeCase = (str) =>
       str
-        .toLowerCase()
-        .replace(/(?:^\w|[A-Z]|\b\w)/g, (word, index) =>
-          index === 0 ? word : '_' + word.toLowerCase()
-        );
+        .replace(/([A-Z])/g, '_$1') // Add underscore before capital letters
+        .toLowerCase();
 
+    // Construct the prompt for the LLM based on selected configurations
     let prompt = `Generate a complete backend application for the following SQL schema in ${language}. `;
-    if (language === 'nodejs' && webFramework) {
+
+    if (language === 'nodejs') {
       prompt += `Use ${webFramework} as the web framework`;
       if (orm) prompt += `, ${orm} as the ORM/query builder`;
       if (dbDriver) prompt += `, ${dbDriver} as the database driver`;
@@ -953,7 +1116,7 @@ function CodeEditor() {
       Ensure proper error handling and modularity. Do not include outline comments or descriptions; provide only the actual file contents.
       Return only the code for each file, prefixed with '// ' followed by the file path.
       `;
-    } else if (language === 'python' && webFramework) {
+    } else if (language === 'python') {
       prompt += `Use ${webFramework} as the web framework`;
       if (orm) prompt += `, ${orm} as the ORM/query builder`;
       if (dbDriver) prompt += `, ${dbDriver} as the database driver`;
@@ -1007,8 +1170,12 @@ function CodeEditor() {
       Use parameterized queries appropriate to the database driver.
       Include a 404 Not Found handler and define routes for each table.
       Ensure proper error handling and modularity. Do not include outline comments or descriptions; provide only the actual file contents.
-      Return only the code for each file, prefixed with '// ' followed by the file path.
+      Return only the code for each file, prefixed with '# ' followed by the file path.
       `;
+    } else {
+      setError('Please select a valid language and web framework.');
+      setLoadingBackend(false);
+      return;
     }
 
     prompt += `
@@ -1024,340 +1191,287 @@ function CodeEditor() {
       return;
     }
 
-    const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+    // Replace with your actual API key handling
+    const API_KEY = import.meta.env.VITE_GEMINI_API_KEY; // Canvas will provide this at runtime
+
     if (!API_KEY) {
       setError(
-        'Please provide your Google Gemini API Key in the .env file (VITE_GEMINI_API_KEY).'
+        'API Key is not configured. Please ensure it is provided in the environment.'
       );
       setLoadingBackend(false);
       return;
     }
-    // const model = 'gemini-2.0-flash';
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          }),
-        }
-      );
 
-      if (!response.ok) {
-        const errorData = await response.json();
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+
+    try {
+      let retries = 0;
+      const maxRetries = 5;
+      let response;
+
+      while (retries < maxRetries) {
+        try {
+          response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            }),
+          });
+
+          if (response.ok) {
+            break; // Success, exit retry loop
+          } else if (response.status === 429) {
+            // Too Many Requests, implement exponential backoff
+            const delay = Math.pow(2, retries) * 1000; // 1s, 2s, 4s, ...
+            console.warn(
+              `Rate limit hit. Retrying in ${delay / 1000} seconds...`
+            );
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            retries++;
+          } else {
+            const errorData = await response.json();
+            throw new Error(
+              `API error: ${response.status} - ${
+                errorData.error?.message || 'Unknown error'
+              }`
+            );
+          }
+        } catch (innerError) {
+          if (retries === maxRetries - 1) {
+            throw innerError; // Re-throw if last retry
+          }
+          retries++;
+          const delay = Math.pow(2, retries) * 1000;
+          console.warn(
+            `Fetch error: ${innerError.message}. Retrying in ${
+              delay / 1000
+            } seconds...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+
+      if (!response || !response.ok) {
         throw new Error(
-          `API error: ${response.status} - ${
-            errorData.error?.message || 'Unknown error'
-          }`
+          'Failed to get a successful response after multiple retries.'
         );
       }
 
       const result = await response.json();
-      if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
-        const rawText = result.candidates[0].content.parts[0].text;
-        await simulateEventStream(rawText);
-        const parsedFiles = parseGeneratedCode(rawText);
-        if (parsedFiles.length === 0) {
-          setError('No files generated from API response.');
-        } else {
-          setGeneratedFiles(parsedFiles);
-          if (parsedFiles.length > 0) {
-            setActiveGeneratedFileId(parsedFiles[0].id);
-          }
-        }
-      } else {
-        setError('No content generated.');
+      const generatedText =
+        result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      if (!generatedText) {
+        setError(
+          'No code was generated. Please try adjusting your query or configurations.'
+        );
+        setLoadingBackend(false);
+        return;
+      }
+
+      // Simulate streaming the output to the user
+      await simulateEventStream(generatedText);
+
+      // Parse the generated code into structured files
+      const parsed = parseGeneratedCode(generatedText);
+      setGeneratedFiles(parsed);
+      if (parsed.length > 0) {
+        setActiveGeneratedFileId(parsed[0].id); // Set the first file as active
       }
     } catch (err) {
-      setError(`Failed to generate code: ${err.message}.`);
+      console.error('Error generating backend code:', err);
+      setError(`Failed to generate code: ${err.message}`);
     } finally {
       setLoadingBackend(false);
     }
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard
-      ?.writeText(text)
-      .then(() => {
-        const messageBox = document.createElement('div');
-        messageBox.textContent = 'Copied to clipboard!';
-        messageBox.className = `fixed bottom-4 right-4 bg-green-600 text-white px-3 py-2 rounded-lg shadow-lg z-50`;
-        document.body.appendChild(messageBox);
-        setTimeout(() => document.body.removeChild(messageBox), 2000);
-      })
-      .catch(() => {
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        const messageBox = document.createElement('div');
-        messageBox.textContent = 'Copied to clipboard!';
-        messageBox.className = `fixed bottom-4 right-4 bg-green-600 text-white px-3 py-2 rounded-lg shadow-lg z-50`;
-        document.body.appendChild(messageBox);
-        setTimeout(() => document.body.removeChild(messageBox), 2000);
-      });
-  };
+  // Function to download the generated project as a ZIP file
+  const downloadProject = async () => {
+    if (generatedFiles.length === 0) {
+      setError('No files to download. Generate code first.');
+      return;
+    }
 
-  const copyFilePath = (path) => {
-    copyToClipboard(path);
-  };
-
-  const downloadAsZip = () => {
     const zip = new JSZip();
     generatedFiles.forEach((file) => {
       zip.file(file.path, file.content);
     });
-    zip.generateAsync({ type: 'blob' }).then((content) => {
-      saveAs(content, 'generated-backend.zip');
-    });
-  };
 
-  const handleKeyDown = (e) => {
-    if (e.ctrlKey && e.key === 's') {
-      e.preventDefault();
-      copyToClipboard(currentGeneratedCode);
+    try {
+      const content = await zip.generateAsync({ type: 'blob' });
+      saveAs(content, 'backend_project.zip');
+    } catch (err) {
+      console.error('Error zipping files:', err);
+      setError('Failed to download project.');
     }
   };
 
-  const getFileIcon = (fileName) => {
-    const ext = fileName.split('.').pop().toLowerCase();
-    const iconStyle = 'w-3 h-3 mr-2';
-
-    switch (ext) {
-      case 'js':
-        return (
-          <div
-            className={`${iconStyle} bg-yellow-500 rounded-sm flex items-center justify-center text-[10px] font-bold text-black`}
-          >
-            JS
-          </div>
-        );
-      case 'py':
-        return (
-          <div
-            className={`${iconStyle} bg-blue-500 rounded-sm flex items-center justify-center text-[10px] font-bold text-white`}
-          >
-            PY
-          </div>
-        );
-      case 'json':
-        return (
-          <div
-            className={`${iconStyle} bg-orange-400 rounded-sm flex items-center justify-center text-[10px] font-bold text-black`}
-          >
-            {}
-          </div>
-        );
-      case 'sql':
-        return (
-          <div
-            className={`${iconStyle} bg-purple-500 rounded-sm flex items-center justify-center text-[10px] font-bold text-white`}
-          >
-            SQL
-          </div>
-        );
-      case 'md':
-        return (
-          <div
-            className={`${iconStyle} bg-gray-400 rounded-sm flex items-center justify-center text-[10px] font-bold text-black`}
-          >
-            MD
-          </div>
-        );
-      case 'env':
-        return (
-          <div
-            className={`${iconStyle} bg-green-500 rounded-sm flex items-center justify-center text-[10px] font-bold text-white`}
-          >
-            .ENV
-          </div>
-        );
-      default:
-        return <File className={iconStyle} />;
-    }
+  // Function to copy file path to clipboard
+  const copyFilePath = (path) => {
+    navigator.clipboard.writeText(path).then(
+      () => {
+        // In a real app, you'd show a toast notification
+        console.log(`Copied path: ${path}`);
+      },
+      (err) => {
+        console.error('Failed to copy path: ', err);
+        setError('Failed to copy path.');
+      }
+    );
   };
 
   return (
-    <div className='h-screen flex flex-col bg-gray-900 text-gray-200 font-mono text-xs'>
+    <div className='flex flex-col h-screen w-screen font-sans bg-gray-900 text-gray-100'>
       {/* Header */}
-      <div className='h-8 bg-gray-800 border-b border-gray-700 flex items-center px-3'>
-        <div className='flex items-center space-x-2'>
-          <div className='w-2 h-2 bg-red-500 rounded-full'></div>
-          <div className='w-2 h-2 bg-yellow-500 rounded-full'></div>
-          <div className='w-2 h-2 bg-green-500 rounded-full'></div>
-        </div>
-        <div className='flex-1 text-center text-xs text-gray-400'>
-          AI-Powered Backend Generator
-        </div>
-        <div className='flex items-center space-x-2'>
+      <header className='flex items-center justify-between p-3 bg-gray-800 border-b border-gray-700 shadow-md flex-shrink-0'>
+        <h1 className='text-lg font-bold text-blue-400'>Gunevo Studio</h1>
+        <div className='flex items-center space-x-3'>
           <button
             onClick={() => setIsConfigOpen(true)}
-            className='p-1 text-gray-400 hover:text-gray-200'
-            title='Configuration'
+            className='flex items-center gap-2 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors shadow-sm'
           >
             <Settings className='w-4 h-4' />
+            Configure
           </button>
           <button
-            onClick={downloadAsZip}
+            onClick={downloadProject}
             disabled={generatedFiles.length === 0}
-            className='p-1 text-gray-400 hover:text-gray-200 disabled:opacity-50'
-            title='Download as ZIP'
+            className='flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-sm transition-colors shadow-sm'
           >
             <Download className='w-4 h-4' />
+            Download
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Error Banner */}
-      {error && (
-        <div className='bg-red-900/50 border-b border-red-700 px-3 py-2 text-red-300 text-xs'>
-          {error}
-        </div>
-      )}
-
-      {/* Main Content */}
-      <div className='flex-1 flex overflow-hidden'>
-        {/* Sidebar: File Tree */}
-        <div className='w-64 bg-gray-800 border-r border-gray-700 flex flex-col'>
-          <div className='h-8 bg-gray-800 border-b border-gray-700 flex items-center px-3'>
-            <span className='text-xs font-medium text-gray-400 uppercase tracking-wide'>
-              Explorer
-            </span>
+      {/* Main content area */}
+      <div className='flex flex-1 overflow-hidden'>
+        {/* Left pane: SQL Editor */}
+        <div className='flex flex-col w-1/2 min-w-[300px] max-w-[50%] bg-gray-800 border-r border-gray-700 flex-shrink-0'>
+          <div className='p-3 bg-gray-700 border-b border-gray-600 flex items-center justify-between'>
+            <h2 className='text-sm font-semibold text-gray-200'>
+              SQL Schema Input
+            </h2>
           </div>
-          <FileTree
-            files={generatedFiles}
-            activeFileId={activeGeneratedFileId}
-            onFileSelect={setActiveGeneratedFileId}
-            onCopyPath={copyFilePath}
+          <Editor
+            height='calc(50% - 3rem)' // Adjust height for header and footer
+            language='sql'
+            theme='vs-dark'
+            value={sqlQuery}
+            onChange={(value) => setSqlQuery(value)}
+            options={{
+              minimap: { enabled: false },
+              fontSize: 13,
+              scrollBeyondLastLine: false,
+              wordWrap: 'on',
+              lineNumbersMinChars: 3,
+            }}
           />
+          <div className='p-3 bg-gray-700 border-t border-gray-600 flex items-center justify-between'>
+            <h2 className='text-sm font-semibold text-gray-200'>
+              Generation Output
+            </h2>
+            {loadingBackend && (
+              <span className='text-blue-400 text-xs flex items-center gap-1'>
+                <svg
+                  className='animate-spin h-3 w-3 text-blue-400'
+                  xmlns='http://www.w3.org/2000/svg'
+                  fill='none'
+                  viewBox='0 0 24 24'
+                >
+                  <circle
+                    className='opacity-25'
+                    cx='12'
+                    cy='12'
+                    r='10'
+                    stroke='currentColor'
+                    strokeWidth='4'
+                  ></circle>
+                  <path
+                    className='opacity-75'
+                    fill='currentColor'
+                    d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                  ></path>
+                </svg>
+                Generating...
+              </span>
+            )}
+          </div>
+          <div
+            ref={streamRef}
+            className='flex-1 p-3 text-xs bg-gray-900 overflow-y-auto custom-scrollbar whitespace-pre-wrap'
+          >
+            {error && <p className='text-red-500 mb-2'>{error}</p>}
+            {streamOutput}
+          </div>
         </div>
 
-        {/* Editor Area */}
-        <div className='flex-1 flex flex-col'>
-          {/* Editors */}
-          <div className='flex-1 flex flex-col md:flex-row'>
-            {/* SQL Editor */}
-            <div className='flex-1 flex flex-col border-r border-gray-700'>
-              <div className='h-8 bg-gray-800 border-b border-gray-700 flex items-center px-3'>
-                <div className='w-3 h-3 bg-purple-500 rounded-sm mr-2'></div>
-                <span className='text-xs text-gray-300'>schema.sql</span>
+        {/* Right pane: File Tree and Code Editor */}
+        <div className='flex flex-col w-1/2 min-w-[300px] flex-grow'>
+          <div className='flex flex-1'>
+            {/* File Tree */}
+            <div className='w-1/3 min-w-[150px] max-w-[30%] bg-gray-800 border-r border-gray-700 flex-shrink-0'>
+              <div className='p-3 bg-gray-700 border-b border-gray-600'>
+                <h2 className='text-sm font-semibold text-gray-200'>
+                  Project Files
+                </h2>
               </div>
-              <div className='flex-1 overflow-auto bg-gray-850'>
-                <Editor
-                  height='100%'
-                  language='sql'
-                  value={sqlQuery}
-                  onChange={setSqlQuery}
-                  onMount={(editor) => {
-                    editor.onKeyDown((e) => {
-                      if (e.ctrlKey && e.keyCode === 83) {
-                        // Ctrl+S
-                        e.preventDefault();
-                        copyToClipboard(sqlQuery);
-                      }
-                    });
-                  }}
-                  options={{
-                    fontFamily: '"Fira Code", "Consolas", monospace',
-                    fontSize: 12,
-                    minimap: { enabled: false },
-                    scrollBeyondLastLine: false,
-                    wordWrap: 'on',
-                  }}
-                  theme='vs-dark'
-                />
-              </div>
+              <FileTree
+                files={generatedFiles}
+                activeFileId={activeGeneratedFileId}
+                onFileSelect={setActiveGeneratedFileId}
+                onCopyPath={copyFilePath}
+              />
             </div>
 
             {/* Code Editor */}
-            <div className='flex-1 flex flex-col'>
-              <div className='h-8 bg-gray-800 border-b border-gray-700 flex items-center px-3'>
-                {activeGeneratedFile ? (
-                  <div className='flex items-center'>
-                    {getFileIcon(activeGeneratedFile.name)}
-                    <span className='text-xs text-gray-300'>
-                      {activeGeneratedFile.name}
-                    </span>
-                  </div>
-                ) : (
-                  <span className='text-xs text-gray-400'>Select a file</span>
-                )}
-                <div className='flex-1' />
-                <button
-                  onClick={() => copyToClipboard(currentGeneratedCode)}
-                  disabled={!currentGeneratedCode}
-                  className='p-1 text-gray-400 hover:text-gray-200 disabled:opacity-50'
-                  title='Copy Code (Ctrl+S)'
-                >
-                  <Copy className='w-4 h-4' />
-                </button>
-              </div>
-              <div className='flex-1 overflow-auto bg-gray-850'>
-                {activeGeneratedFile ? (
-                  <Editor
-                    height='100%'
-                    language={currentGeneratedCodeLanguage}
-                    value={currentGeneratedCode}
-                    onChange={(code) =>
-                      setGeneratedFiles((prevFiles) =>
-                        prevFiles.map((file) =>
-                          file.id === activeGeneratedFileId
-                            ? { ...file, content: code }
-                            : file
-                        )
-                      )
-                    }
-                    onMount={(editor) => {
-                      editor.onKeyDown((e) => {
-                        if (e.ctrlKey && e.keyCode === 83) {
-                          // Ctrl+S
-                          e.preventDefault();
-                          copyToClipboard(currentGeneratedCode);
-                        }
-                      });
-                    }}
-                    options={{
-                      fontFamily: '"Fira Code", "Consolas", monospace',
-                      fontSize: 12,
-                      minimap: { enabled: false },
-                      scrollBeyondLastLine: false,
-                      wordWrap: 'on',
-                    }}
-                    theme='vs-dark'
-                  />
-                ) : (
-                  <div className='flex items-center justify-center h-full text-gray-400'>
-                    <div className='text-center'>
-                      <File className='w-12 h-12 mx-auto mb-2 opacity-50' />
-                      <p className='text-xs'>No file selected</p>
-                      <p className='text-xs'>
-                        Choose a file from the explorer or generate new code
-                      </p>
-                    </div>
-                  </div>
+            <div className='flex flex-col flex-grow bg-gray-900'>
+              <div className='p-3 bg-gray-700 border-b border-gray-600 flex items-center justify-between'>
+                <h2 className='text-sm font-semibold text-gray-200'>
+                  {activeGeneratedFile
+                    ? activeGeneratedFile.path
+                    : 'Select a file'}
+                </h2>
+                {activeGeneratedFile && (
+                  <button
+                    onClick={() => copyFilePath(activeGeneratedFile.path)}
+                    className='flex items-center gap-1 px-2 py-0.5 bg-gray-600 hover:bg-gray-500 text-white rounded text-xs transition-colors'
+                  >
+                    <Copy className='w-3 h-3' />
+                    Copy Path
+                  </button>
                 )}
               </div>
+              <Editor
+                height='100%'
+                language={currentGeneratedCodeLanguage}
+                theme='vs-dark'
+                value={currentGeneratedCode}
+                options={{
+                  readOnly: false, // Allow editing
+                  minimap: { enabled: false },
+                  fontSize: 13,
+                  scrollBeyondLastLine: false,
+                  wordWrap: 'on',
+                  lineNumbersMinChars: 3,
+                }}
+                onChange={(newValue) => {
+                  // Update the content of the active file when edited
+                  setGeneratedFiles((prevFiles) =>
+                    prevFiles.map((file) =>
+                      file.id === activeGeneratedFileId
+                        ? { ...file, content: newValue }
+                        : file
+                    )
+                  );
+                }}
+              />
             </div>
           </div>
         </div>
       </div>
-
-      {/* Streaming Output */}
-      {loadingBackend && (
-        <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50'>
-          <div className='bg-gray-800 rounded-lg p-4 text-center'>
-            <div className='animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3'></div>
-            <p className='text-xs text-gray-300'>Generating backend code...</p>
-            <pre className='text-xs font-mono p-2 mt-2 rounded bg-gray-850 text-gray-300 max-h-32 overflow-y-auto'>
-              {streamOutput || 'Initializing...'}
-            </pre>
-          </div>
-        </div>
-      )}
 
       {/* Configuration Modal */}
       {isConfigOpen && (
@@ -1400,32 +1514,26 @@ function CodeEditor() {
         />
       )}
 
-      {/* Footer */}
-      {/* <div className='h-8 bg-gray-800 border-t border-gray-700 flex items-center px-3 text-xs text-gray-400'>
-        <p>
-          **Security Note:** For production, store your Gemini API key securely
-          on a backend server or use serverless functions.
-        </p>
-        {generatedFiles.some(
-          (file) =>
-            file.name === 'app.js' ||
-            file.name === 'manage.py' ||
-            file.name === 'main.py'
-        ) && (
-          <p className='ml-auto'>
-            **Run Command:**{' '}
-            <code>
-              {language === 'nodejs'
-                ? 'npm start'
-                : webFramework === 'django'
-                ? 'python manage.py runserver'
-                : 'uvicorn main:app --reload'}
-            </code>
-          </p>
-        )}
-      </div> */}
+      {/* Custom Scrollbar Styles */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #333;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #555;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #777;
+        }
+      `}</style>
     </div>
   );
 }
 
-export default CodeEditor;
+export default App;
