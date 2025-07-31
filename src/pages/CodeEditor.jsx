@@ -1,12 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Editor from 'react-simple-code-editor';
-import Prism from 'prismjs';
-import 'prismjs/components/prism-sql';
-import 'prismjs/components/prism-javascript';
-import 'prismjs/components/prism-python';
-import 'prismjs/components/prism-json';
-import 'prismjs/components/prism-markdown';
-import 'prismjs/themes/prism-dark.css';
+import Editor from '@monaco-editor/react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import {
@@ -823,18 +816,17 @@ const ConfigModal = ({
 };
 
 function CodeEditor() {
-  const initialSqlQuery = `CREATE TABLE users (
+  const initialSqlQuery = `CREATE TABLE customers (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(255) NOT NULL UNIQUE,
-    email VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE
   );
 
-  CREATE TABLE products (
-    product_id INT AUTO_INCREMENT PRIMARY KEY,
-    product_name VARCHAR(255) NOT NULL,
-    price DECIMAL(10, 2) NOT NULL,
-    stock_quantity INT DEFAULT 0
+  CREATE TABLE orders (
+    order_id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    total_amount DECIMAL(10, 2) NOT NULL
   );`;
 
   const [sqlQuery, setSqlQuery] = useState(initialSqlQuery);
@@ -889,6 +881,37 @@ function CodeEditor() {
     setActiveGeneratedFileId(null);
     setStreamOutput('');
 
+    // Parse table names from SQL query
+    const tableRegex = /CREATE\s+TABLE\s+(?:`)?(\w+)(?:`)?\s*\(/gi;
+    const tables = [];
+    let match;
+    while ((match = tableRegex.exec(sqlQuery)) !== null) {
+      tables.push(match[1]);
+    }
+
+    if (tables.length === 0) {
+      setError('No tables found in the SQL query.');
+      setLoadingBackend(false);
+      return;
+    }
+
+    // Helper functions for naming conventions
+    const toCamelCase = (str) =>
+      str
+        .toLowerCase()
+        .replace(/(?:^\w|[A-Z]|\b\w|_+)/g, (word, index) =>
+          index === 0
+            ? word.toLowerCase()
+            : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        )
+        .replace(/_/g, '');
+    const toSnakeCase = (str) =>
+      str
+        .toLowerCase()
+        .replace(/(?:^\w|[A-Z]|\b\w)/g, (word, index) =>
+          index === 0 ? word : '_' + word.toLowerCase()
+        );
+
     let prompt = `Generate a complete backend application for the following SQL schema in ${language}. `;
     if (language === 'nodejs' && webFramework) {
       prompt += `Use ${webFramework} as the web framework`;
@@ -912,17 +935,21 @@ function CodeEditor() {
       - \`.env\` (environment variables)
       - \`src/app.js\` (main application setup with API docs and 404 middleware)
       - \`src/config/db.js\` (database connection)
-      - \`src/models/usersModel.js\` (model for users table)
-      - \`src/models/productsModel.js\` (model for products table)
-      - \`src/controllers/usersController.js\` (controller logic for users)
-      - \`src/controllers/productsController.js\` (controller logic for products)
-      - \`src/routes/usersRoutes.js\` (API routes for users)
-      - \`src/routes/productsRoutes.js\` (API routes for products)
+      ${tables
+        .map(
+          (table) => `
+      - \`src/models/${toCamelCase(table)}Model.js\` (model for ${table} table)
+      - \`src/controllers/${toCamelCase(
+        table
+      )}Controller.js\` (controller logic for ${table})
+      - \`src/routes/${toCamelCase(table)}Routes.js\` (API routes for ${table})`
+        )
+        .join('\n')}
       - \`src/swagger.json\` (Swagger configuration, if applicable)
 
       For each table in the SQL schema, create corresponding model, controller, and route files with standard CRUD operations (create, read, update, delete).
       Use parameterized queries appropriate to the database driver (e.g., ? for mysql2, $1 for pg).
-      Include a  Displaying 404 Not Found middleware and define product and user routes.
+      Include a 404 Not Found middleware and define routes for each table.
       Ensure proper error handling and modularity. Do not include outline comments or descriptions; provide only the actual file contents.
       Return only the code for each file, prefixed with '// ' followed by the file path.
       `;
@@ -952,15 +979,33 @@ function CodeEditor() {
       - \`.env\` (environment variables)
       ${
         webFramework === 'django'
-          ? '- `manage.py` (Django management script)\n- `project/settings.py` (project settings)\n- `project/urls.py` (URL configuration)\n- `users/models.py` (model for users table)\n- `users/views.py` (views for users)\n- `products/models.py` (model for products table)\n- `products/views.py` (views for products)\n- `users/urls.py` (URL routes for users)\n- `products/urls.py` (URL routes for products)'
-          : '- `main.py` (main FastAPI application)\n- `database.py` (database connection)\n- `models/users.py` (model for users table)\n- `models/products.py` (model for products table)\n- `routes/users.py` (API routes for users)\n- `routes/products.py` (API routes for products)'
+          ? `- \`manage.py\` (Django management script)
+      - \`project/settings.py\` (project settings)
+      - \`project/urls.py\` (URL configuration)
+      ${tables
+        .map(
+          (table) => `
+      - \`${toSnakeCase(table)}/models.py\` (model for ${table} table)
+      - \`${toSnakeCase(table)}/views.py\` (views for ${table})
+      - \`${toSnakeCase(table)}/urls.py\` (URL routes for ${table})`
+        )
+        .join('\n')}`
+          : `- \`main.py\` (main FastAPI application)
+      - \`database.py\` (database connection)
+      ${tables
+        .map(
+          (table) => `
+      - \`models/${toSnakeCase(table)}.py\` (model for ${table} table)
+      - \`routes/${toSnakeCase(table)}.py\` (API routes for ${table})`
+        )
+        .join('\n')}`
       }
 
       For each table in the SQL schema, create corresponding models and ${
         webFramework === 'django' ? 'views' : 'endpoints'
       } with standard CRUD operations.
       Use parameterized queries appropriate to the database driver.
-      Include a 404 Not Found handler and define user and product routes.
+      Include a 404 Not Found handler and define routes for each table.
       Ensure proper error handling and modularity. Do not include outline comments or descriptions; provide only the actual file contents.
       Return only the code for each file, prefixed with '// ' followed by the file path.
       `;
@@ -987,7 +1032,7 @@ function CodeEditor() {
       setLoadingBackend(false);
       return;
     }
-
+    // const model = 'gemini-2.0-flash';
     try {
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`,
@@ -1194,36 +1239,42 @@ function CodeEditor() {
         {/* Editor Area */}
         <div className='flex-1 flex flex-col'>
           {/* Editors */}
-          <div className='flex-1 flex flex-col md:flex-row min-h-0'>
+          <div className='flex-1 flex flex-col md:flex-row'>
             {/* SQL Editor */}
-            <div className='flex-1 flex flex-col border-r border-gray-700 min-h-0'>
+            <div className='flex-1 flex flex-col border-r border-gray-700'>
               <div className='h-8 bg-gray-800 border-b border-gray-700 flex items-center px-3'>
                 <div className='w-3 h-3 bg-purple-500 rounded-sm mr-2'></div>
                 <span className='text-xs text-gray-300'>schema.sql</span>
               </div>
-              <div className='flex-1 overflow-x-auto overflow-y-auto bg-gray-850 min-w-0 min-h-0 max-h-[calc(100vh-4rem)]'>
+              <div className='flex-1 overflow-auto bg-gray-850'>
                 <Editor
+                  height='100%'
+                  language='sql'
                   value={sqlQuery}
-                  onValueChange={setSqlQuery}
-                  highlight={(code) =>
-                    Prism.highlight(code, Prism.languages.sql, 'sql')
-                  }
-                  padding={10}
-                  className='h-full font-mono text-xs bg-gray-850 text-gray-200 whitespace-pre min-h-0 overflow-y-auto'
-                  style={{
+                  onChange={setSqlQuery}
+                  onMount={(editor) => {
+                    editor.onKeyDown((e) => {
+                      if (e.ctrlKey && e.keyCode === 83) {
+                        // Ctrl+S
+                        e.preventDefault();
+                        copyToClipboard(sqlQuery);
+                      }
+                    });
+                  }}
+                  options={{
                     fontFamily: '"Fira Code", "Consolas", monospace',
                     fontSize: 12,
-                    height: '100%',
-                    overflow: 'auto',
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    wordWrap: 'on',
                   }}
-                  textareaClassName='focus:outline-none resize-none overflow-y-auto'
-                  onKeyDown={handleKeyDown}
+                  theme='vs-dark'
                 />
               </div>
             </div>
 
             {/* Code Editor */}
-            <div className='flex-1 flex flex-col min-h-0'>
+            <div className='flex-1 flex flex-col'>
               <div className='h-8 bg-gray-800 border-b border-gray-700 flex items-center px-3'>
                 {activeGeneratedFile ? (
                   <div className='flex items-center'>
@@ -1245,11 +1296,13 @@ function CodeEditor() {
                   <Copy className='w-4 h-4' />
                 </button>
               </div>
-              <div className='flex-1 overflow-x-auto overflow-y-auto bg-gray-850 min-w-0 min-h-0 max-h-[calc(100vh-4rem)]'>
+              <div className='flex-1 overflow-auto bg-gray-850'>
                 {activeGeneratedFile ? (
                   <Editor
+                    height='100%'
+                    language={currentGeneratedCodeLanguage}
                     value={currentGeneratedCode}
-                    onValueChange={(code) =>
+                    onChange={(code) =>
                       setGeneratedFiles((prevFiles) =>
                         prevFiles.map((file) =>
                           file.id === activeGeneratedFileId
@@ -1258,28 +1311,23 @@ function CodeEditor() {
                         )
                       )
                     }
-                    highlight={(code) => {
-                      const grammar =
-                        Prism.languages[currentGeneratedCodeLanguage] ||
-                        (language === 'python'
-                          ? Prism.languages.python
-                          : Prism.languages.javascript);
-                      return Prism.highlight(
-                        code,
-                        grammar,
-                        currentGeneratedCodeLanguage
-                      );
+                    onMount={(editor) => {
+                      editor.onKeyDown((e) => {
+                        if (e.ctrlKey && e.keyCode === 83) {
+                          // Ctrl+S
+                          e.preventDefault();
+                          copyToClipboard(currentGeneratedCode);
+                        }
+                      });
                     }}
-                    padding={10}
-                    className='h-full font-mono text-xs bg-gray-850 text-gray-200 whitespace-pre min-h-0 overflow-y-auto'
-                    style={{
+                    options={{
                       fontFamily: '"Fira Code", "Consolas", monospace',
                       fontSize: 12,
-                      height: '100%',
-                      overflow: 'auto',
+                      minimap: { enabled: false },
+                      scrollBeyondLastLine: false,
+                      wordWrap: 'on',
                     }}
-                    textareaClassName='focus:outline-none resize-none overflow-y-auto'
-                    onKeyDown={handleKeyDown}
+                    theme='vs-dark'
                   />
                 ) : (
                   <div className='flex items-center justify-center h-full text-gray-400'>
@@ -1353,7 +1401,7 @@ function CodeEditor() {
       )}
 
       {/* Footer */}
-      <div className='h-8 bg-gray-800 border-t border-gray-700 flex items-center px-3 text-xs text-gray-400'>
+      {/* <div className='h-8 bg-gray-800 border-t border-gray-700 flex items-center px-3 text-xs text-gray-400'>
         <p>
           **Security Note:** For production, store your Gemini API key securely
           on a backend server or use serverless functions.
@@ -1375,7 +1423,7 @@ function CodeEditor() {
             </code>
           </p>
         )}
-      </div>
+      </div> */}
     </div>
   );
 }
