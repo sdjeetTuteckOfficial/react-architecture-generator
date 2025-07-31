@@ -19,18 +19,15 @@ import {
 // Helper function to parse the generated markdown into a file structure
 const parseGeneratedCode = (markdownText) => {
   const files = [];
-  // Regex to find lines starting with // or # followed by a path, then capture content until the next such line or end of string
   const fileRegex = /^(?:\/\/|#)\s*([^\n]+)\n([\s\S]*?)(?=(?:^\/\/|^#|\Z))/gm;
   let match;
 
   while ((match = fileRegex.exec(markdownText)) !== null) {
     const fullPath = match[1].trim();
-    // Skip lines that look like comments or descriptions, not file paths
     if (fullPath.match(/^\w+\s+\w+/)) continue;
     let content = match[2].trim();
-    if (!content) continue; // Skip if no content
+    if (!content) continue;
 
-    // Remove markdown code block fences if they exist
     content = content.replace(
       /```(?:javascript|python|json|sql|markdown)?\n|\n```/g,
       ''
@@ -40,9 +37,7 @@ const parseGeneratedCode = (markdownText) => {
     const fileName = pathParts.pop();
     const fileExtension = fileName.split('.').pop();
 
-    let language = 'plaintext'; // Default language
-
-    // Determine language based on file extension
+    let language = 'plaintext';
     if (fileExtension === 'js' || fileExtension === 'jsx')
       language = 'javascript';
     else if (fileExtension === 'py') language = 'python';
@@ -56,10 +51,10 @@ const parseGeneratedCode = (markdownText) => {
     else if (fileExtension === 'xml') language = 'xml';
     else if (fileExtension === 'yml' || fileExtension === 'yaml')
       language = 'yaml';
-    else if (fileExtension === 'env') language = 'ini'; // .env files often use INI-like syntax
+    else if (fileExtension === 'env') language = 'ini';
 
     files.push({
-      id: fullPath, // Unique ID for the file
+      id: fullPath,
       path: fullPath,
       name: fileName,
       content: content,
@@ -70,12 +65,11 @@ const parseGeneratedCode = (markdownText) => {
   return files;
 };
 
-// VS Code-like file tree component
+// FileTree Component
 const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
   const [expandedDirs, setExpandedDirs] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Build a tree structure from the flat list of files
   const tree = {};
   files.forEach((file) => {
     const parts = file.path.split('/');
@@ -92,7 +86,6 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
     });
   });
 
-  // Toggle directory expansion
   const toggleDirectory = (path) => {
     setExpandedDirs((prev) => ({
       ...prev,
@@ -100,10 +93,9 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
     }));
   };
 
-  // Get file icon based on extension
   const getFileIcon = (fileName) => {
     const ext = fileName.split('.').pop().toLowerCase();
-    const iconStyle = 'w-3 h-3 mr-2 flex-shrink-0'; // Added flex-shrink-0 to prevent icon from shrinking
+    const iconStyle = 'w-4 h-4 mr-2 flex-shrink-0';
 
     switch (ext) {
       case 'js':
@@ -185,54 +177,49 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
     }
   };
 
-  // Recursively render the file tree
   const renderTree = (node, path = '', depth = 0) => {
     const filteredEntries = Object.entries(node)
       .filter(([key, item]) => {
         if (item.type === 'file') {
           return key.toLowerCase().includes(searchTerm.toLowerCase());
         }
-        // If it's a directory, check if any of its children match the search term
-        if (item.type === 'directory') {
-          return (
-            JSON.stringify(item.children)
-              .toLowerCase()
-              .includes(searchTerm.toLowerCase()) ||
-            key.toLowerCase().includes(searchTerm.toLowerCase())
-          );
-        }
-        return true;
+        return (
+          JSON.stringify(item.children)
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          key.toLowerCase().includes(searchTerm.toLowerCase())
+        );
       })
       .sort((a, b) => {
         const aIsDir = a[1].type === 'directory';
         const bIsDir = b[1].type === 'directory';
-        if (aIsDir && !bIsDir) return -1; // Directories first
+        if (aIsDir && !bIsDir) return -1;
         if (!aIsDir && bIsDir) return 1;
-        return a[0].localeCompare(b[0]); // Then alphabetical
+        return a[0].localeCompare(b[0]);
       });
 
     return filteredEntries.map(([key, item]) => {
       const currentPath = path ? `${path}/${key}` : key;
-      const paddingLeft = `${depth * 16 + 8}px`; // Indentation for depth
+      const paddingLeft = `${depth * 16 + 8}px`;
 
       if (item.type === 'directory') {
-        const isExpanded = expandedDirs[currentPath] !== false; // Default to expanded
+        const isExpanded = expandedDirs[currentPath] !== false;
         return (
           <div key={currentPath}>
             <div
-              className='flex items-center h-6 px-2 text-xs cursor-pointer hover:bg-gray-700/50 text-gray-300'
+              className='flex items-center h-8 px-2 text-sm cursor-pointer hover:bg-gray-700/70 text-gray-300 transition-colors'
               style={{ paddingLeft }}
               onClick={() => toggleDirectory(currentPath)}
             >
               {isExpanded ? (
-                <ChevronDown className='w-3 h-3 mr-1 text-gray-400' />
+                <ChevronDown className='w-4 h-4 mr-2 text-gray-400' />
               ) : (
-                <ChevronRight className='w-3 h-3 mr-1 text-gray-400' />
+                <ChevronRight className='w-4 h-4 mr-2 text-gray-400' />
               )}
               {isExpanded ? (
-                <FolderOpen className='w-3 h-3 mr-1 text-blue-400' />
+                <FolderOpen className='w-4 h-4 mr-2 text-blue-400' />
               ) : (
-                <Folder className='w-3 h-3 mr-1 text-blue-400' />
+                <Folder className='w-4 h-4 mr-2 text-blue-400' />
               )}
               <span className='truncate'>{key}</span>
             </div>
@@ -243,11 +230,11 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
         return (
           <div
             key={item.id}
-            className={`flex items-center h-6 px-2 text-xs cursor-pointer hover:bg-gray-700/50 ${
+            className={`flex items-center h-8 px-2 text-sm cursor-pointer hover:bg-gray-700/70 ${
               activeFileId === item.id
                 ? 'bg-blue-600/50 text-white'
                 : 'text-gray-300'
-            }`}
+            } transition-colors`}
             style={{ paddingLeft }}
             onClick={() => onFileSelect(item.id)}
             onContextMenu={(e) => {
@@ -263,7 +250,6 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
     });
   };
 
-  // Auto-expand all directories by default when files change
   useEffect(() => {
     const allDirs = {};
     const buildExpandedState = (node, path = '') => {
@@ -277,26 +263,26 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
     };
     buildExpandedState(tree);
     setExpandedDirs(allDirs);
-  }, [files]); // Dependency on files ensures re-evaluation when files list changes
+  }, [files]);
 
   return (
     <div className='flex flex-col h-full bg-gray-800 rounded-lg shadow-lg overflow-hidden'>
-      <div className='p-2 border-b border-gray-700'>
+      <div className='p-3 border-b border-gray-700 bg-gray-700/50'>
         <div className='relative'>
-          <Search className='absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400' />
+          <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400' />
           <input
             type='text'
             placeholder='Search files...'
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className='w-full pl-8 pr-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded text-gray-200 placeholder-gray-400 focus:outline-none focus:border-blue-500'
+            className='w-full pl-10 pr-8 py-2 text-sm bg-gray-900/50 border border-gray-600 rounded-lg text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all'
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className='absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200'
+              className='absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200'
             >
-              <X className='w-4 h-4' />
+              <X className='w-5 h-5' />
             </button>
           )}
         </div>
@@ -305,7 +291,7 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
         {files.length > 0 ? (
           renderTree(tree)
         ) : (
-          <p className='text-xs p-4 text-gray-400 font-mono text-center'>
+          <p className='text-sm p-4 text-gray-400 font-mono text-center'>
             No files to display. Generate a backend to see files.
           </p>
         )}
@@ -314,7 +300,7 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyPath }) => {
   );
 };
 
-// Configuration modal component
+// ConfigModal Component
 const ConfigModal = ({
   language,
   setLanguage,
@@ -352,7 +338,6 @@ const ConfigModal = ({
   isLoading,
   onClose,
 }) => {
-  // Define options for each library/feature
   const libraryOptions = {
     language: [
       {
@@ -768,7 +753,6 @@ const ConfigModal = ({
     },
   };
 
-  // Reset dependent dropdowns when language changes
   useEffect(() => {
     setWebFramework('');
     setOrm('');
@@ -787,7 +771,6 @@ const ConfigModal = ({
     setEmailing('');
   }, [language]);
 
-  // Function to get the current value of a state variable dynamically
   const getDynamicValue = (key) => {
     switch (key) {
       case 'webFramework':
@@ -825,7 +808,6 @@ const ConfigModal = ({
     }
   };
 
-  // Function to set the value of a state variable dynamically
   const setDynamicValue = (key, value) => {
     switch (key) {
       case 'webFramework':
@@ -879,27 +861,26 @@ const ConfigModal = ({
   };
 
   return (
-    <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'>
-      <div className='bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-4xl mx-auto max-h-[90vh] overflow-y-auto custom-scrollbar'>
-        <div className='flex items-center justify-between mb-4'>
-          <h2 className='text-lg font-semibold text-white'>Configuration</h2>
+    <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm'>
+      <div className='bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-5xl max-h-[90vh] overflow-y-auto custom-scrollbar'>
+        <div className='flex items-center justify-between mb-6'>
+          <h2 className='text-xl font-bold text-white'>Configuration</h2>
           <button
             onClick={onClose}
-            className='text-gray-400 hover:text-gray-200'
+            className='text-gray-400 hover:text-gray-200 transition-colors'
           >
-            <X className='w-5 h-5' />
+            <X className='w-6 h-6' />
           </button>
         </div>
-        <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4'>
-          {/* Language selection */}
+        <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6'>
           <div className='relative group'>
-            <label className='block text-xs font-medium text-gray-300 mb-1 capitalize'>
+            <label className='block text-sm font-medium text-gray-300 mb-2'>
               Language
             </label>
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className='w-full p-1.5 text-xs bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-blue-500'
+              className='w-full p-2.5 text-sm bg-gray-900/50 border border-gray-600 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all'
             >
               <option value=''>Select Language</option>
               {libraryOptions.language.map((option) => (
@@ -908,39 +889,35 @@ const ConfigModal = ({
                 </option>
               ))}
             </select>
-            <div className='absolute hidden group-hover:block bg-gray-600 text-white text-xs rounded p-2 mt-1 z-10 max-w-xs'>
+            <div className='absolute hidden group-hover:block bg-gray-700 text-white text-xs rounded-lg p-3 mt-2 z-10 max-w-xs shadow-lg'>
               {libraryOptions.language.find((opt) => opt.value === language)
                 ?.tooltip || 'Select a programming language.'}
             </div>
           </div>
-
-          {/* Dynamic dropdowns for other options */}
           {Object.keys(libraryOptions)
-            .filter((key) => key !== 'language') // Exclude language, as it's handled separately
+            .filter((key) => key !== 'language')
             .map((key) => (
               <div key={key} className='relative group'>
-                <label className='block text-xs font-medium text-gray-300 mb-1 capitalize'>
-                  {key.replace(/([A-Z])/g, ' $1')}{' '}
-                  {/* Add space before capital letters */}
+                <label className='block text-sm font-medium text-gray-300 mb-2 capitalize'>
+                  {key.replace(/([A-Z])/g, ' $1')}
                 </label>
                 <select
                   value={getDynamicValue(key)}
                   onChange={(e) => setDynamicValue(key, e.target.value)}
-                  className='w-full p-1.5 text-xs bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-blue-500'
-                  disabled={!language || !libraryOptions[key][language]} // Disable if no language or no options for the language
+                  className='w-full p-2.5 text-sm bg-gray-900/50 border border-gray-600 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all'
+                  disabled={!language || !libraryOptions[key][language]}
                 >
                   <option value=''>
                     Select {key.replace(/([A-Z])/g, ' $1')}
                   </option>
                   {language &&
-                    libraryOptions[key][language] &&
-                    libraryOptions[key][language].map((option) => (
+                    libraryOptions[key][language]?.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
                     ))}
                 </select>
-                <div className='absolute hidden group-hover:block bg-gray-600 text-white text-xs rounded p-2 mt-1 z-10 max-w-xs'>
+                <div className='absolute hidden group-hover:block bg-gray-700 text-white text-xs rounded-lg p-3 mt-2 z-10 max-w-xs shadow-lg'>
                   {(language &&
                     libraryOptions[key][language]?.find(
                       (opt) => opt.value === getDynamicValue(key)
@@ -950,16 +927,16 @@ const ConfigModal = ({
               </div>
             ))}
         </div>
-        <div className='mt-6'>
+        <div className='mt-8'>
           <button
             onClick={() => {
               onGenerate();
               onClose();
             }}
-            disabled={isLoading || !webFramework} // Disable if loading or no web framework selected
-            className='w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-xs transition-colors'
+            disabled={isLoading || !webFramework}
+            className='w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-all shadow-md'
           >
-            <Play className='w-4 h-4' />
+            <Play className='w-5 h-5' />
             {isLoading ? 'Generating...' : 'Generate Backend'}
           </button>
         </div>
@@ -968,8 +945,8 @@ const ConfigModal = ({
   );
 };
 
-function App() {
-  // Initial SQL query for demonstration
+// App Component
+function CodeEditor() {
   const initialSqlQuery = `CREATE TABLE customers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -989,7 +966,7 @@ function App() {
   const [loadingBackend, setLoadingBackend] = useState(false);
   const [error, setError] = useState('');
   const [streamOutput, setStreamOutput] = useState('');
-  const [language, setLanguage] = useState('nodejs'); // Default language
+  const [language, setLanguage] = useState('nodejs');
   const [webFramework, setWebFramework] = useState('');
   const [orm, setOrm] = useState('');
   const [dbDriver, setDbDriver] = useState('');
@@ -1005,10 +982,12 @@ function App() {
   const [rateLimit, setRateLimit] = useState('');
   const [scheduler, setScheduler] = useState('');
   const [emailing, setEmailing] = useState('');
-  const [isConfigOpen, setIsConfigOpen] = useState(false); // State for config modal visibility
-  const streamRef = useRef(null); // Ref for scrolling stream output
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [sqlEditorHeight, setSqlEditorHeight] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
+  const streamRef = useRef(null);
+  const dividerRef = useRef(null);
 
-  // Find the currently active file for the Monaco Editor
   const activeGeneratedFile = generatedFiles.find(
     (file) => file.id === activeGeneratedFileId
   );
@@ -1019,21 +998,54 @@ function App() {
     ? activeGeneratedFile.language
     : 'javascript';
 
-  // Simulate streaming output (for demonstration, not actual API streaming)
+  const startDragging = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const stopDragging = () => {
+    setIsDragging(false);
+  };
+
+  const onDrag = (e) => {
+    if (!isDragging) return;
+    const container = dividerRef.current.parentElement;
+    const containerRect = container.getBoundingClientRect();
+    const newHeight =
+      ((e.clientY - containerRect.top) / containerRect.height) * 100;
+    if (newHeight >= 20 && newHeight <= 80) {
+      setSqlEditorHeight(newHeight);
+    }
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e) => onDrag(e);
+    const handleMouseUp = () => stopDragging();
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
+
   const simulateEventStream = async (apiResponseText) => {
     setStreamOutput('');
     const chunks = apiResponseText.split('\n').filter((line) => line.trim());
     for (let i = 0; i < chunks.length; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 50)); // Simulate delay
+      await new Promise((resolve) => setTimeout(resolve, 50));
       setStreamOutput((prev) => prev + chunks[i] + '\n');
       if (streamRef.current) {
-        streamRef.current.scrollTop = streamRef.current.scrollHeight; // Auto-scroll
+        streamRef.current.scrollTop = streamRef.current.scrollHeight;
       }
     }
     return apiResponseText;
   };
 
-  // Function to generate backend code using the LLM
   const generateBackendCode = async () => {
     setError('');
     setLoadingBackend(true);
@@ -1041,7 +1053,6 @@ function App() {
     setActiveGeneratedFileId(null);
     setStreamOutput('');
 
-    // Parse table names from SQL query
     const tableRegex = /CREATE\s+TABLE\s+(?:`)?(\w+)(?:`)?\s*\(/gi;
     const tables = [];
     let match;
@@ -1057,7 +1068,6 @@ function App() {
       return;
     }
 
-    // Helper functions for naming conventions
     const toCamelCase = (str) =>
       str
         .toLowerCase()
@@ -1068,14 +1078,9 @@ function App() {
         )
         .replace(/_/g, '');
 
-    const toSnakeCase = (str) =>
-      str
-        .replace(/([A-Z])/g, '_$1') // Add underscore before capital letters
-        .toLowerCase();
+    const toSnakeCase = (str) => str.replace(/([A-Z])/g, '_$1').toLowerCase();
 
-    // Construct the prompt for the LLM based on selected configurations
     let prompt = `Generate a complete backend application for the following SQL schema in ${language}. `;
-
     if (language === 'nodejs') {
       prompt += `Use ${webFramework} as the web framework`;
       if (orm) prompt += `, ${orm} as the ORM/query builder`;
@@ -1109,7 +1114,6 @@ function App() {
         )
         .join('\n')}
       - \`src/swagger.json\` (Swagger configuration, if applicable)
-
       For each table in the SQL schema, create corresponding model, controller, and route files with standard CRUD operations (create, read, update, delete).
       Use parameterized queries appropriate to the database driver (e.g., ? for mysql2, $1 for pg).
       Include a 404 Not Found middleware and define routes for each table.
@@ -1163,7 +1167,6 @@ function App() {
         )
         .join('\n')}`
       }
-
       For each table in the SQL schema, create corresponding models and ${
         webFramework === 'django' ? 'views' : 'endpoints'
       } with standard CRUD operations.
@@ -1191,9 +1194,7 @@ function App() {
       return;
     }
 
-    // Replace with your actual API key handling
-    const API_KEY = import.meta.env.VITE_GEMINI_API_KEY; // Canvas will provide this at runtime
-
+    const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
     if (!API_KEY) {
       setError(
         'API Key is not configured. Please ensure it is provided in the environment.'
@@ -1220,10 +1221,9 @@ function App() {
           });
 
           if (response.ok) {
-            break; // Success, exit retry loop
+            break;
           } else if (response.status === 429) {
-            // Too Many Requests, implement exponential backoff
-            const delay = Math.pow(2, retries) * 1000; // 1s, 2s, 4s, ...
+            const delay = Math.pow(2, retries) * 1000;
             console.warn(
               `Rate limit hit. Retrying in ${delay / 1000} seconds...`
             );
@@ -1239,7 +1239,7 @@ function App() {
           }
         } catch (innerError) {
           if (retries === maxRetries - 1) {
-            throw innerError; // Re-throw if last retry
+            throw innerError;
           }
           retries++;
           const delay = Math.pow(2, retries) * 1000;
@@ -1270,14 +1270,11 @@ function App() {
         return;
       }
 
-      // Simulate streaming the output to the user
       await simulateEventStream(generatedText);
-
-      // Parse the generated code into structured files
       const parsed = parseGeneratedCode(generatedText);
       setGeneratedFiles(parsed);
       if (parsed.length > 0) {
-        setActiveGeneratedFileId(parsed[0].id); // Set the first file as active
+        setActiveGeneratedFileId(parsed[0].id);
       }
     } catch (err) {
       console.error('Error generating backend code:', err);
@@ -1287,7 +1284,6 @@ function App() {
     }
   };
 
-  // Function to download the generated project as a ZIP file
   const downloadProject = async () => {
     if (generatedFiles.length === 0) {
       setError('No files to download. Generate code first.');
@@ -1308,11 +1304,9 @@ function App() {
     }
   };
 
-  // Function to copy file path to clipboard
   const copyFilePath = (path) => {
     navigator.clipboard.writeText(path).then(
       () => {
-        // In a real app, you'd show a toast notification
         console.log(`Copied path: ${path}`);
       },
       (err) => {
@@ -1324,59 +1318,74 @@ function App() {
 
   return (
     <div className='flex flex-col h-screen w-screen font-sans bg-gray-900 text-gray-100'>
-      {/* Header */}
-      <header className='flex items-center justify-between p-3 bg-gray-800 border-b border-gray-700 shadow-md flex-shrink-0'>
-        <h1 className='text-lg font-bold text-blue-400'>Gunevo Studio</h1>
-        <div className='flex items-center space-x-3'>
+      <header className='flex items-center justify-between p-4 bg-gray-800 border-b border-gray-700 shadow-lg'>
+        <h1 className='text-xl font-bold text-blue-400'>Gunevo Studio</h1>
+        <div className='flex items-center space-x-4'>
           <button
             onClick={() => setIsConfigOpen(true)}
-            className='flex items-center gap-2 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors shadow-sm'
+            className='flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-all shadow-md'
           >
-            <Settings className='w-4 h-4' />
+            <Settings className='w-5 h-5' />
             Configure
           </button>
           <button
             onClick={downloadProject}
             disabled={generatedFiles.length === 0}
-            className='flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-sm transition-colors shadow-sm'
+            className='flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-all shadow-md'
           >
-            <Download className='w-4 h-4' />
+            <Download className='w-5 h-5' />
             Download
           </button>
         </div>
       </header>
-
-      {/* Main content area */}
       <div className='flex flex-1 overflow-hidden'>
-        {/* Left pane: SQL Editor */}
-        <div className='flex flex-col w-1/2 min-w-[300px] max-w-[50%] bg-gray-800 border-r border-gray-700 flex-shrink-0'>
-          <div className='p-3 bg-gray-700 border-b border-gray-600 flex items-center justify-between'>
+        <div
+          className='flex flex-col w-1/2 min-w-[350px] max-w-[50%] bg-gray-800 border-r border-gray-700 flex-shrink-0'
+          ref={dividerRef}
+        >
+          <div className='p-4 bg-gray-700/50 border-b border-gray-600 flex items-center justify-between'>
             <h2 className='text-sm font-semibold text-gray-200'>
               SQL Schema Input
             </h2>
           </div>
-          <Editor
-            height='calc(50% - 3rem)' // Adjust height for header and footer
-            language='sql'
-            theme='vs-dark'
-            value={sqlQuery}
-            onChange={(value) => setSqlQuery(value)}
-            options={{
-              minimap: { enabled: false },
-              fontSize: 13,
-              scrollBeyondLastLine: false,
-              wordWrap: 'on',
-              lineNumbersMinChars: 3,
-            }}
+          <div style={{ height: `${sqlEditorHeight}%`, minHeight: '100px' }}>
+            <Editor
+              height='100%'
+              language='sql'
+              theme='vs-dark'
+              value={sqlQuery}
+              onChange={(value) => setSqlQuery(value)}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 14,
+                scrollBeyondLastLine: false,
+                wordWrap: 'on',
+                lineNumbersMinChars: 3,
+                padding: { top: 10, bottom: 10 },
+                scrollbar: {
+                  vertical: 'auto',
+                  horizontal: 'auto',
+                  useShadows: true,
+                  verticalHasArrows: false,
+                  horizontalHasArrows: false,
+                  verticalScrollbarSize: 8,
+                  horizontalScrollbarSize: 8,
+                },
+              }}
+            />
+          </div>
+          <div
+            className='h-2 bg-gray-600 cursor-ns-resize hover:bg-blue-500 transition-colors'
+            onMouseDown={startDragging}
           />
-          <div className='p-3 bg-gray-700 border-t border-gray-600 flex items-center justify-between'>
+          <div className='p-4 bg-gray-700/50 border-t border-gray-600 flex items-center justify-between'>
             <h2 className='text-sm font-semibold text-gray-200'>
               Generation Output
             </h2>
             {loadingBackend && (
-              <span className='text-blue-400 text-xs flex items-center gap-1'>
+              <span className='text-blue-400 text-sm flex items-center gap-2'>
                 <svg
-                  className='animate-spin h-3 w-3 text-blue-400'
+                  className='animate-spin h-5 w-5 text-blue-400'
                   xmlns='http://www.w3.org/2000/svg'
                   fill='none'
                   viewBox='0 0 24 24'
@@ -1401,35 +1410,33 @@ function App() {
           </div>
           <div
             ref={streamRef}
-            className='flex-1 p-3 text-xs bg-gray-900 overflow-y-auto custom-scrollbar whitespace-pre-wrap'
+            className='flex-1 p-4 text-sm bg-gray-900 overflow-y-auto custom-scrollbar whitespace-pre-wrap'
+            style={{ minHeight: '100px' }}
           >
-            {error && <p className='text-red-500 mb-2'>{error}</p>}
+            {error && <p className='text-red-500 mb-3 font-medium'>{error}</p>}
             {streamOutput}
           </div>
         </div>
-
-        {/* Right pane: File Tree and Code Editor */}
-        <div className='flex flex-col w-1/2 min-w-[300px] flex-grow'>
-          <div className='flex flex-1'>
-            {/* File Tree */}
-            <div className='w-1/3 min-w-[150px] max-w-[30%] bg-gray-800 border-r border-gray-700 flex-shrink-0'>
-              <div className='p-3 bg-gray-700 border-b border-gray-600'>
+        <div className='flex flex-col w-1/2 min-w-[350px] flex-grow'>
+          <div className='flex flex-1 overflow-hidden'>
+            <div className='w-1/3 min-w-[200px] max-w-[30%] bg-gray-800 border-r border-gray-700 flex-shrink-0 flex flex-col'>
+              <div className='p-4 bg-gray-700/50 border-b border-gray-600'>
                 <h2 className='text-sm font-semibold text-gray-200'>
                   Project Files
                 </h2>
               </div>
-              <FileTree
-                files={generatedFiles}
-                activeFileId={activeGeneratedFileId}
-                onFileSelect={setActiveGeneratedFileId}
-                onCopyPath={copyFilePath}
-              />
+              <div className='flex-1 overflow-y-auto custom-scrollbar'>
+                <FileTree
+                  files={generatedFiles}
+                  activeFileId={activeGeneratedFileId}
+                  onFileSelect={setActiveGeneratedFileId}
+                  onCopyPath={copyFilePath}
+                />
+              </div>
             </div>
-
-            {/* Code Editor */}
             <div className='flex flex-col flex-grow bg-gray-900'>
-              <div className='p-3 bg-gray-700 border-b border-gray-600 flex items-center justify-between'>
-                <h2 className='text-sm font-semibold text-gray-200'>
+              <div className='p-4 bg-gray-700/50 border-b border-gray-600 flex items-center justify-between'>
+                <h2 className='text-sm font-semibold text-gray-200 truncate'>
                   {activeGeneratedFile
                     ? activeGeneratedFile.path
                     : 'Select a file'}
@@ -1437,43 +1444,52 @@ function App() {
                 {activeGeneratedFile && (
                   <button
                     onClick={() => copyFilePath(activeGeneratedFile.path)}
-                    className='flex items-center gap-1 px-2 py-0.5 bg-gray-600 hover:bg-gray-500 text-white rounded text-xs transition-colors'
+                    className='flex items-center gap-2 px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm transition-all'
                   >
-                    <Copy className='w-3 h-3' />
+                    <Copy className='w-4 h-4' />
                     Copy Path
                   </button>
                 )}
               </div>
-              <Editor
-                height='100%'
-                language={currentGeneratedCodeLanguage}
-                theme='vs-dark'
-                value={currentGeneratedCode}
-                options={{
-                  readOnly: false, // Allow editing
-                  minimap: { enabled: false },
-                  fontSize: 13,
-                  scrollBeyondLastLine: false,
-                  wordWrap: 'on',
-                  lineNumbersMinChars: 3,
-                }}
-                onChange={(newValue) => {
-                  // Update the content of the active file when edited
-                  setGeneratedFiles((prevFiles) =>
-                    prevFiles.map((file) =>
-                      file.id === activeGeneratedFileId
-                        ? { ...file, content: newValue }
-                        : file
-                    )
-                  );
-                }}
-              />
+              <div className='flex-1 overflow-hidden'>
+                <Editor
+                  height='100%'
+                  language={currentGeneratedCodeLanguage}
+                  theme='vs-dark'
+                  value={currentGeneratedCode}
+                  options={{
+                    readOnly: false,
+                    minimap: { enabled: false },
+                    fontSize: 14,
+                    scrollBeyondLastLine: false,
+                    wordWrap: 'on',
+                    lineNumbersMinChars: 3,
+                    padding: { top: 10, bottom: 10 },
+                    scrollbar: {
+                      vertical: 'auto',
+                      horizontal: 'auto',
+                      useShadows: true,
+                      verticalHasArrows: false,
+                      horizontalHasArrows: false,
+                      verticalScrollbarSize: 8,
+                      horizontalScrollbarSize: 8,
+                    },
+                  }}
+                  onChange={(newValue) => {
+                    setGeneratedFiles((prevFiles) =>
+                      prevFiles.map((file) =>
+                        file.id === activeGeneratedFileId
+                          ? { ...file, content: newValue }
+                          : file
+                      )
+                    );
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Configuration Modal */}
       {isConfigOpen && (
         <ConfigModal
           language={language}
@@ -1513,27 +1529,25 @@ function App() {
           onClose={() => setIsConfigOpen(false)}
         />
       )}
-
-      {/* Custom Scrollbar Styles */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
           height: 8px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: #333;
+          background: #2d3748;
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #555;
+          background: #4a5568;
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #777;
+          background: #718096;
         }
       `}</style>
     </div>
   );
 }
 
-export default App;
+export default CodeEditor;
