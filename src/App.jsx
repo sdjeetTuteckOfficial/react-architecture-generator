@@ -10,7 +10,7 @@ import Dashboard from './pages/Dashboard';
 import FlowPage from './pages/FlowPage';
 import ProtectedRoute from './route/ProtectedRoute';
 import ChatInterface from './pages/Chatbot';
-import CodeEditor from './pages/CodeEditor';
+import CodeEditor from './pages/code-editor/CodeEditor';
 
 export default function App() {
   return (
