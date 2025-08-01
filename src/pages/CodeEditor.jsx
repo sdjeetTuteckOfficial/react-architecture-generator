@@ -264,7 +264,7 @@ const FileTree = ({ files, activeFileId, onFileSelect, onCopyContent }) => {
   // Keep all folders closed initially (remove the useEffect that expanded all folders)
 
   return (
-    <div className='flex flex-col h-full bg-gradient-to-b from-gray-800 to-gray-900 rounded-lg shadow-xl overflow-hidden border border-gray-700'>
+    <div className='flex flex-col h-full bg-gradient-to-b from-gray-800 to-gray-900 shadow-xl overflow-hidden border border-gray-700'>
       <div className='p-3 border-b border-gray-700 bg-gradient-to-r from-gray-700/80 to-gray-600/80'>
         <div className='relative'>
           <Search className='absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400' />
