@@ -11,8 +11,11 @@ import FlowPage from './pages/FlowPage';
 import ProtectedRoute from './route/ProtectedRoute';
 import ChatInterface from './pages/Chatbot';
 import CodeEditor from './pages/code-editor/CodeEditor';
+import { useSelector } from 'react-redux';
 
 export default function App() {
+  const diagramType = useSelector((state) => state.diagram.diagramType);
+  console.log('Current diagram type:', diagramType);
   return (
     <Router>
       <div className='min-h-screen'>
