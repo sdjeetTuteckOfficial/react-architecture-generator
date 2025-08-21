@@ -6,6 +6,8 @@ import {
   Navigate,
 } from 'react-router-dom';
 import Login from './pages/Login';
+import ForgetPassword from './pages/ForgetPassword';
+import SignUp from './pages/SignUp';
 import Dashboard from './pages/Dashboard';
 import FlowPage from './pages/FlowPage';
 import ProtectedRoute from './route/ProtectedRoute';
@@ -19,6 +21,8 @@ export default function App() {
         <Routes>
           {/* Public Routes */}
           <Route path='/login' element={<Login />} />
+          <Route path='/forgot-password' element={<ForgetPassword />} />
+          <Route path='/signup' element={<SignUp />} />
 
           {/* Protected Routes */}
           <Route
