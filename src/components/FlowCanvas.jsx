@@ -29,6 +29,7 @@ import {
   processImagePath,
   isWithinBounds,
 } from '../hooks/useFlowStates';
+import FloatingChatButton from './FloatingChatButton';
 
 // FlowCanvas now accepts all flow state and setters as props
 function FlowCanvas({
@@ -68,6 +69,59 @@ function FlowCanvas({
     },
     [setNodes, setSelectedNode, setIsModalOpen]
   );
+
+  const handleDiagramUpdate = (data) => {
+    console.log('Updating diagram with data:', data);
+    const newNodes = data.nodes.map((node) => {
+      let nodeType = 'custom';
+      let nodeData = { ...node.data, onEdit: handleEditNode };
+      console.log('diagramType', diagramType);
+      if (diagramType === 'architecture') {
+        nodeType = node.data.image ? 'custom' : 'default';
+        nodeData.image = processImagePath(node.data.image);
+      } else if (diagramType === 'db_diagram') {
+        console.log('Creating DB node:', nodeType, node.data);
+        nodeType = 'dbTableNode';
+      }
+
+      return {
+        ...node,
+        type: nodeType,
+        position: node.position || { x: 100, y: 100 },
+        data: nodeData,
+        zIndex: node.zIndex || 1,
+      };
+    });
+
+    const nodeIds = new Set(newNodes.map((n) => n.id));
+    const newEdges = data.edges
+      .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
+      .map((e, i) => ({ id: e.id || `edge-${i}`, ...e }));
+
+    setNodes(newNodes);
+    setEdges(newEdges);
+    setTimeout(() => fitView({ padding: 0.2 }), 100);
+    // Update nodes with proper onEdit handlers
+    // const updatedNodes = diagramData.nodes.map((node) => ({
+    //   ...node,
+    //   data: {
+    //     ...node.data,
+    //     onEdit: handleEditNode,
+    //   },
+    // }));
+
+    // setNodes(updatedNodes);
+    // setEdges(diagramData.edges);
+    // setTimeout(() => fitView({ padding: 0.2 }), 100);
+  };
+
+  // // Make the callback available globally for the chat component
+  // useEffect(() => {
+  //   window.updateDiagramFromChat = handleDiagramUpdate;
+  //   return () => {
+  //     delete window.updateDiagramFromChat;
+  //   };
+  // }, [handleDiagramUpdate]);
 
   const addResizableRectangle = useCallback(
     (type = 'resizableRectangle') => {
@@ -123,6 +177,7 @@ function FlowCanvas({
             nodeType = node.data.image ? 'custom' : 'default';
             nodeData.image = processImagePath(node.data.image);
           } else if (diagramType === 'db_diagram') {
+            console.log('Creating DB node:', nodeType, data);
             nodeType = 'dbTableNode';
           }
 
@@ -511,7 +566,11 @@ function FlowCanvas({
         )}
       </div>
 
-      <ChatInput onSubmit={handleGenerateDiagram} />
+      {/* <ChatInput onSubmit={handleGenerateDiagram} /> */}
+      <FloatingChatButton
+        apiBaseUrl='http://localhost:8000'
+        handleGenerateDiagram={handleDiagramUpdate}
+      />
     </>
   );
 }
