@@ -1,14 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, User } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import gunevoLogo from '/public/images/gunevo.svg';
 
-const Login = () => {
+const SignUp = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
-    rememberMe: false,
+    confirmPassword: '',
+    acceptTerms: false,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,21 +32,36 @@ const Login = () => {
     setError('');
 
     try {
+      // Basic validation
+      if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.confirmPassword) {
+        setError('Please fill in all fields');
+        return;
+      }
+
+      if (formData.password !== formData.confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
+
+      if (!formData.acceptTerms) {
+        setError('Please accept the terms and conditions');
+        return;
+      }
+
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      if (formData.email && formData.password) {
-        console.log('Login successful!');
-        // In a real application, you would handle authentication here (e.g., Firebase Auth)
-        // For demonstration, we'll simulate a token and user storage.
-        localStorage.setItem('authToken', 'simulated-auth-token');
-        localStorage.setItem('user', JSON.stringify({ email: formData.email }));
-        navigate('/dashboard');
-      } else {
-        setError('Please fill in all fields');
-      }
+      console.log('Registration successful!');
+      // In a real application, you would handle registration here
+      localStorage.setItem('authToken', 'simulated-auth-token');
+      localStorage.setItem('user', JSON.stringify({ 
+        email: formData.email, 
+        firstName: formData.firstName, 
+        lastName: formData.lastName 
+      }));
+      navigate('/dashboard');
     } catch (err) {
-      setError('Login failed. Please try again.');
+      setError('Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -53,13 +72,13 @@ const Login = () => {
       className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden font-inter
       bg-gray-50 dark:bg-gray-950
       bg-[url('data:image/svg+xml,%3Csvg%20width%3D%22100%22%20height%3D%22100%22%20viewBox%3D%220%200%20100%20100%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cdefs%3E%3Cpattern%20id%3D%22grid%22%20width%3D%2210%22%20height%3D%2210%22%20x%3D%220%22%20y%3D%220%22%20patternUnits%3D%22userSpaceOnUse%22%3E%3Cpath%20d%3D%22M10%200L0%200L0%2010%22%20fill%3D%22none%22%20stroke%3D%22%23000000%22%20stroke-width%3D%220.1%22%20opacity%3D%220.1%22%2F%3E%3C%2Fpattern%3E%3Cpattern%20id%3D%22ruler%22%20width%3D%22100%22%20height%3D%22100%22%20x%3D%220%22%20y%3D%220%22%20patternUnits%3D%22userSpaceOnUse%22%3E%3Cline%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22100%22%20y2%3D%220%22%20stroke%3D%22%23000000%22%20stroke-width%3D%220.2%22%20opacity%3D%220.15%22%2F%3E%3Cline%20x1%3D%220%22%20y1%3D%2225%22%20x2%3D%22100%22%20y2%3D%2225%22%20stroke%3D%22%23000000%22%20stroke-width%3D%220.1%22%20opacity%3D%220.1%22%2F%3E%3Cline%20x1%3D%220%22%20y1%3D%2250%22%20x2%3D%22100%22%20y2%3D%2250%22%20stroke%3D%22%23000000%22%20stroke-width%3D%220.2%22%20opacity%3D%220.15%22%2F%3E%3Cline%20x1%3D%220%22%20y1%3D%2275%22%20x2%3D%22100%22%20y2%3D%2275%22%20stroke%3D%22%23000000%22%20stroke-width%3D%220.1%22%20opacity%3D%220.1%22%2F%3E%3Cline%20x1%3D%220%22%20y1%3D%22100%22%20x2%3D%22100%22%20y2%3D%22100%22%20stroke%3D%22%23000000%22%20stroke-width%3D%220.2%22%20opacity%3D%220.15%22%2F%3E%3Cline%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%22100%22%20stroke%3D%22%23000000%22%20stroke-width%3D%220.2%22%20opacity%3D%220.15%22%2F%3E%3Cline%20x1%3D%2225%22%20y1%3D%220%22%20x2%3D%2225%22%20y2%3D%22100%22%20stroke%3D%22%23000000%22%20stroke-width%3D%220.1%22%20opacity%3D%220.1%22%2F%3E%3Cline%20x1%3D%2250%22%20y1%3D%220%22%20x2%3D%2250%22%20y2%3D%22100%22%20stroke%3D%22%23000000%22%20stroke-width%3D%220.2%22%20opacity%3D%220.15%22%2F%3E%3Cline%20x1%3D%2275%22%20y1%3D%220%22%20x2%3D%2275%22%20y2%3D%22100%22%20stroke%3D%22%23000000%22%20stroke-width%3D%220.1%22%20opacity%3D%220.1%22%2F%3E%3Cline%20x1%3D%22100%22%20y1%3D%220%22%20x2%3D%22100%22%20y2%3D%22100%22%20stroke%3D%22%23000000%22%20stroke-width%3D%220.2%22%20opacity%3D%220.15%22%2F%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2240%22%20fill%3D%22none%22%20stroke%3D%22%23000000%22%20stroke-width%3D%220.1%22%20opacity%3D%220.1%22%2F%3E%3Cline%20x1%3D%2250%22%20y1%3D%2210%22%20x2%3D%2250%22%20y2%3D%2290%22%20stroke%3D%22%23000000%22%20stroke-width%3D%220.1%22%20opacity%3D%220.1%22%20transform%3D%22rotate(45%2050%2050)%22%2F%3E%3Cline%20x1%3D%2250%22%20y1%3D%2210%22%20x2%3D%2250%22%20y2%3D%2290%22%20stroke%3D%22%23000000%22%20stroke-width%3D%220.1%22%20opacity%3D%220.1%22%20transform%3D%22rotate(135%2050%2050)%22%2F%3E%3C%2Fpattern%3E%3C%2Fdefs%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22url(%23grid)%22%2F%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22url(%23ruler)%22%2F%3E%3C%2Fsvg%3E')]
-      bg-repeat bg-center
+      bg-repeat bg-center py-12
     "
     >
       {/* Main Card */}
       <div className='relative z-10'>
         {/* Card with enhanced shadow and animations */}
-        <div className='bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-2xl shadow-blue-500/10 dark:shadow-blue-500/20 p-6 w-full max-w-sm border border-white/50 dark:border-gray-700/50 transition-all duration-300'>
+        <div className='bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-2xl shadow-blue-500/10 dark:shadow-blue-500/20 p-6 w-full max-w-md border border-white/50 dark:border-gray-700/50 transition-all duration-300'>
           {/* Animated Header */}
           <div className='text-center mb-6'>
             {/* Main Logo with complex animation */}
@@ -94,7 +113,6 @@ const Login = () => {
               </div>
             </div>
             <div className='mb-2 text-center'>
-              {/* Replaced gunevoLogo image with styled text */}
               <div className='mb-4 text-center'>
                 <img
                   src={gunevoLogo}
@@ -107,7 +125,7 @@ const Login = () => {
               className='text-gray-500 dark:text-gray-400 animate-fade-in text-sm'
               style={{ animationDelay: '0.2s' }}
             >
-              Please sign in to your account
+              Create your account
             </p>
           </div>
 
@@ -123,10 +141,44 @@ const Login = () => {
 
           {/* Form with staggered animations */}
           <div className='space-y-4'>
+            {/* Name Fields Row */}
+            <div className='grid grid-cols-2 gap-3 animate-slide-up' style={{ animationDelay: '0.1s' }}>
+              <div className='group'>
+                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  First Name
+                </label>
+                <input
+                  name='firstName'
+                  type='text'
+                  value={formData.firstName}
+                  onChange={handleInputChange}
+                  className='w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 hover:border-gray-300 hover:shadow-md
+                    bg-white dark:bg-gray-700 text-gray-900 dark:text-white dark:border-gray-600 text-sm'
+                  placeholder='First name'
+                  required
+                />
+              </div>
+              <div className='group'>
+                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  Last Name
+                </label>
+                <input
+                  name='lastName'
+                  type='text'
+                  value={formData.lastName}
+                  onChange={handleInputChange}
+                  className='w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 hover:border-gray-300 hover:shadow-md
+                    bg-white dark:bg-gray-700 text-gray-900 dark:text-white dark:border-gray-600 text-sm'
+                  placeholder='Last name'
+                  required
+                />
+              </div>
+            </div>
+
             {/* Email Field */}
             <div
               className='group animate-slide-up'
-              style={{ animationDelay: '0.1s' }}
+              style={{ animationDelay: '0.2s' }}
             >
               <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                 Email
@@ -147,10 +199,11 @@ const Login = () => {
                 />
               </div>
             </div>
+
             {/* Password Field */}
             <div
               className='group animate-slide-up'
-              style={{ animationDelay: '0.2s' }}
+              style={{ animationDelay: '0.3s' }}
             >
               <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                 Password
@@ -182,45 +235,78 @@ const Login = () => {
                 </button>
               </div>
             </div>
-            {/* Options Row */}
+
+            {/* Confirm Password Field */}
             <div
-              className='flex items-center justify-between text-xs animate-slide-up'
-              style={{ animationDelay: '0.3s' }}
+              className='group animate-slide-up'
+              style={{ animationDelay: '0.4s' }}
             >
-              <label className='flex items-center cursor-pointer group'>
-                <div className='relative'>
-                  <input
-                    name='rememberMe'
-                    type='checkbox'
-                    checked={formData.rememberMe}
-                    onChange={handleInputChange}
-                    className='w-3.5 h-3.5 text-blue-600 border-2 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200
-                      dark:bg-gray-600 dark:border-gray-500 dark:checked:bg-blue-600'
-                  />
-                  {formData.rememberMe && (
-                    <div className='absolute inset-0 flex items-center justify-center pointer-events-none'>
-                      <div className='w-2 h-2 bg-blue-600 rounded-full animate-ping'></div>
-                    </div>
-                  )}
-                </div>
-                <span className='ml-2 text-gray-600 group-hover:text-gray-800 transition-colors dark:text-gray-400 dark:group-hover:text-gray-200'>
-                  Remember me
-                </span>
+              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                Confirm Password
               </label>
-              <Link
-                to='/forgot-password'
-                className='text-blue-600 hover:text-blue-800 font-medium transition-all duration-200 hover:scale-105 relative group dark:text-blue-400 dark:hover:text-blue-300'
-              >
-                Forgot password?
-                <span className='absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 group-hover:w-full transition-all duration-300'></span>
-              </Link>
+              <div className='relative'>
+                <div className='absolute left-3 top-1/2 transform -translate-y-1/2 transition-all duration-300 group-focus-within:scale-110'>
+                  <Lock className='h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-all duration-300 group-focus-within:animate-pulse' />
+                </div>
+                <input
+                  name='confirmPassword'
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                  className='w-full pl-11 pr-12 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 hover:border-gray-300 hover:shadow-md
+                    bg-white dark:bg-gray-700 text-gray-900 dark:text-white dark:border-gray-600 text-sm'
+                  placeholder='Confirm your password'
+                  required
+                />
+                <button
+                  type='button'
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className='absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all duration-200 hover:scale-110 focus:outline-none'
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className='h-5 w-5 animate-pulse' />
+                  ) : (
+                    <Eye className='h-5 w-5 hover:animate-bounce' />
+                  )}
+                </button>
+              </div>
             </div>
+
+            {/* Terms Checkbox */}
+            <div
+              className='flex items-start text-xs animate-slide-up'
+              style={{ animationDelay: '0.5s' }}
+            >
+              <div className='flex items-center h-5'>
+                <input
+                  name='acceptTerms'
+                  type='checkbox'
+                  checked={formData.acceptTerms}
+                  onChange={handleInputChange}
+                  className='w-3.5 h-3.5 text-blue-600 border-2 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200
+                    dark:bg-gray-600 dark:border-gray-500 dark:checked:bg-blue-600'
+                />
+              </div>
+              <div className='ml-2'>
+                <span className='text-gray-600 dark:text-gray-400'>
+                  I agree to the{' '}
+                  <Link to='/terms' className='text-blue-600 hover:text-blue-800 font-medium transition-colors dark:text-blue-400 dark:hover:text-blue-300'>
+                    Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link to='/privacy' className='text-blue-600 hover:text-blue-800 font-medium transition-colors dark:text-blue-400 dark:hover:text-blue-300'>
+                    Privacy Policy
+                  </Link>
+                </span>
+              </div>
+            </div>
+
             {/* Submit Button */}
             <button
               onClick={handleSubmit}
-              disabled={isLoading}
+              disabled={isLoading || !formData.acceptTerms}
               className='w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold py-2.5 px-4 rounded-xl hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center group shadow-lg hover:shadow-xl animate-slide-up relative overflow-hidden text-sm'
-              style={{ animationDelay: '0.4s' }}
+              style={{ animationDelay: '0.6s' }}
             >
               {/* Button shine effect */}
               <div className='absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-12'></div>
@@ -228,11 +314,11 @@ const Login = () => {
               {isLoading ? (
                 <div className='flex items-center relative z-10'>
                   <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
-                  <span className='animate-pulse'>Signing in...</span>
+                  <span className='animate-pulse'>Creating account...</span>
                 </div>
               ) : (
                 <div className='flex items-center relative z-10'>
-                  <span>Sign in</span>
+                  <span>Create account</span>
                   <ArrowRight className='ml-2 h-4 w-4 group-hover:translate-x-1 group-hover:scale-110 transition-all duration-200' />
                 </div>
               )}
@@ -242,14 +328,14 @@ const Login = () => {
           {/* Footer */}
           <p
             className='mt-5 text-center text-xs text-gray-600 animate-fade-in dark:text-gray-400'
-            style={{ animationDelay: '0.5s' }}
+            style={{ animationDelay: '0.7s' }}
           >
-            Don't have an account?{' '}
+            Already have an account?{' '}
             <Link
-              to='/signup'
+              to='/login'
               className='text-blue-600 hover:text-blue-800 font-medium transition-all duration-200 hover:scale-105 inline-block relative group dark:text-blue-400 dark:hover:text-blue-300'
             >
-              Sign up
+              Sign in
               <span className='absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 group-hover:w-full transition-all duration-300'></span>
             </Link>
           </p>
@@ -319,4 +405,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default SignUp;

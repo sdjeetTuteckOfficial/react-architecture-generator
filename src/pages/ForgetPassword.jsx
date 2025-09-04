@@ -1,24 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { Eye, EyeOff, Mail, Lock, ArrowRight, User } from 'lucide-react';
-import { useNavigate, Link } from 'react-router-dom';
-import gunevoLogo from '/public/images/gunevo.svg';
+import React, { useState } from 'react';
+import { Mail, ArrowRight, User } from 'lucide-react'; // Eye, EyeOff, Lock are not needed for forgot password
+import gunevoLogo from '/public/images/gunevo.svg'; // Assuming the logo path is correct
 
-const Login = () => {
-  const [showPassword, setShowPassword] = useState(false);
+const ForgotPassword = () => {
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
-    rememberMe: false,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: value,
     }));
   };
 
@@ -26,23 +22,29 @@ const Login = () => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setSuccessMessage('');
+
+    if (!formData.email) {
+      setError('Please enter your email address.');
+      setIsLoading(false);
+      return;
+    }
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Simulate API call for password reset
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      if (formData.email && formData.password) {
-        console.log('Login successful!');
-        // In a real application, you would handle authentication here (e.g., Firebase Auth)
-        // For demonstration, we'll simulate a token and user storage.
-        localStorage.setItem('authToken', 'simulated-auth-token');
-        localStorage.setItem('user', JSON.stringify({ email: formData.email }));
-        navigate('/dashboard');
+      // Simulate success or failure based on email (for demonstration)
+      if (formData.email === 'test@example.com') {
+        setSuccessMessage('Password reset link sent to your email!');
+        setFormData({ email: '' }); // Clear the form
       } else {
-        setError('Please fill in all fields');
+        setError('If an account with that email exists, a password reset link has been sent.');
+        // In a real app, you might still show a generic success message
+        // to avoid revealing if an email is registered.
       }
     } catch (err) {
-      setError('Login failed. Please try again.');
+      setError('Failed to send reset link. Please try again later.');
     } finally {
       setIsLoading(false);
     }
@@ -94,20 +96,20 @@ const Login = () => {
               </div>
             </div>
             <div className='mb-2 text-center'>
-              {/* Replaced gunevoLogo image with styled text */}
-              <div className='mb-4 text-center'>
-                <img
-                  src={gunevoLogo}
-                  alt='Gunevo Logo'
-                  className='w-48 mx-auto'
-                />
-              </div>
+              <img
+                src={gunevoLogo}
+                alt='Gunevo Logo'
+                className='w-48 mx-auto'
+              />
             </div>
+            <h2 className='text-2xl font-bold text-gray-800 dark:text-white mb-2 animate-fade-in'>
+              Forgot Password?
+            </h2>
             <p
               className='text-gray-500 dark:text-gray-400 animate-fade-in text-sm'
               style={{ animationDelay: '0.2s' }}
             >
-              Please sign in to your account
+              Enter your email to reset your password
             </p>
           </div>
 
@@ -117,6 +119,16 @@ const Login = () => {
               <div className='flex items-center'>
                 <div className='w-2 h-2 bg-red-400 rounded-full mr-2 animate-pulse'></div>
                 {error}
+              </div>
+            </div>
+          )}
+
+          {/* Success Message */}
+          {successMessage && (
+            <div className='mb-4 p-3 bg-green-50 border-l-4 border-green-400 text-green-700 text-sm rounded-r-lg dark:bg-green-900/20 dark:border-green-600 dark:text-green-300'>
+              <div className='flex items-center'>
+                <div className='w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse'></div>
+                {successMessage}
               </div>
             </div>
           )}
@@ -147,80 +159,12 @@ const Login = () => {
                 />
               </div>
             </div>
-            {/* Password Field */}
-            <div
-              className='group animate-slide-up'
-              style={{ animationDelay: '0.2s' }}
-            >
-              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                Password
-              </label>
-              <div className='relative'>
-                <div className='absolute left-3 top-1/2 transform -translate-y-1/2 transition-all duration-300 group-focus-within:scale-110'>
-                  <Lock className='h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-all duration-300 group-focus-within:animate-pulse' />
-                </div>
-                <input
-                  name='password'
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className='w-full pl-11 pr-12 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 hover:border-gray-300 hover:shadow-md
-                    bg-white dark:bg-gray-700 text-gray-900 dark:text-white dark:border-gray-600 text-sm'
-                  placeholder='Enter your password'
-                  required
-                />
-                <button
-                  type='button'
-                  onClick={() => setShowPassword(!showPassword)}
-                  className='absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all duration-200 hover:scale-110 focus:outline-none'
-                >
-                  {showPassword ? (
-                    <EyeOff className='h-5 w-5 animate-pulse' />
-                  ) : (
-                    <Eye className='h-5 w-5 hover:animate-bounce' />
-                  )}
-                </button>
-              </div>
-            </div>
-            {/* Options Row */}
-            <div
-              className='flex items-center justify-between text-xs animate-slide-up'
-              style={{ animationDelay: '0.3s' }}
-            >
-              <label className='flex items-center cursor-pointer group'>
-                <div className='relative'>
-                  <input
-                    name='rememberMe'
-                    type='checkbox'
-                    checked={formData.rememberMe}
-                    onChange={handleInputChange}
-                    className='w-3.5 h-3.5 text-blue-600 border-2 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200
-                      dark:bg-gray-600 dark:border-gray-500 dark:checked:bg-blue-600'
-                  />
-                  {formData.rememberMe && (
-                    <div className='absolute inset-0 flex items-center justify-center pointer-events-none'>
-                      <div className='w-2 h-2 bg-blue-600 rounded-full animate-ping'></div>
-                    </div>
-                  )}
-                </div>
-                <span className='ml-2 text-gray-600 group-hover:text-gray-800 transition-colors dark:text-gray-400 dark:group-hover:text-gray-200'>
-                  Remember me
-                </span>
-              </label>
-              <Link
-                to='/forgot-password'
-                className='text-blue-600 hover:text-blue-800 font-medium transition-all duration-200 hover:scale-105 relative group dark:text-blue-400 dark:hover:text-blue-300'
-              >
-                Forgot password?
-                <span className='absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 group-hover:w-full transition-all duration-300'></span>
-              </Link>
-            </div>
             {/* Submit Button */}
             <button
               onClick={handleSubmit}
               disabled={isLoading}
               className='w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold py-2.5 px-4 rounded-xl hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center group shadow-lg hover:shadow-xl animate-slide-up relative overflow-hidden text-sm'
-              style={{ animationDelay: '0.4s' }}
+              style={{ animationDelay: '0.2s' }} // Adjusted delay for single input field
             >
               {/* Button shine effect */}
               <div className='absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-12'></div>
@@ -228,11 +172,11 @@ const Login = () => {
               {isLoading ? (
                 <div className='flex items-center relative z-10'>
                   <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
-                  <span className='animate-pulse'>Signing in...</span>
+                  <span className='animate-pulse'>Sending link...</span>
                 </div>
               ) : (
                 <div className='flex items-center relative z-10'>
-                  <span>Sign in</span>
+                  <span>Reset Password</span>
                   <ArrowRight className='ml-2 h-4 w-4 group-hover:translate-x-1 group-hover:scale-110 transition-all duration-200' />
                 </div>
               )}
@@ -242,16 +186,30 @@ const Login = () => {
           {/* Footer */}
           <p
             className='mt-5 text-center text-xs text-gray-600 animate-fade-in dark:text-gray-400'
-            style={{ animationDelay: '0.5s' }}
+            style={{ animationDelay: '0.3s' }} // Adjusted delay
+          >
+            Remembered your password?{' '}
+            {/* Using a regular anchor for demonstration, in a real app use Link from react-router-dom */}
+            <a
+              href='/login'
+              className='text-blue-600 hover:text-blue-800 font-medium transition-all duration-200 hover:scale-105 inline-block relative group dark:text-blue-400 dark:hover:text-blue-300'
+            >
+              Sign in
+              <span className='absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 group-hover:w-full transition-all duration-300'></span>
+            </a>
+          </p>
+          <p
+            className='mt-2 text-center text-xs text-gray-600 animate-fade-in dark:text-gray-400'
+            style={{ animationDelay: '0.4s' }} // Adjusted delay
           >
             Don't have an account?{' '}
-            <Link
-              to='/signup'
+            <a
+              href='/signup'
               className='text-blue-600 hover:text-blue-800 font-medium transition-all duration-200 hover:scale-105 inline-block relative group dark:text-blue-400 dark:hover:text-blue-300'
             >
               Sign up
               <span className='absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 group-hover:w-full transition-all duration-300'></span>
-            </Link>
+            </a>
           </p>
         </div>
       </div>
@@ -319,4 +277,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default ForgotPassword;
