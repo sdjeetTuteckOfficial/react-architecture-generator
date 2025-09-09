@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, User } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import gunevoLogo from '/public/images/gunevo.svg';
+import axios from 'axios';
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -28,21 +29,22 @@ const Login = () => {
     setError('');
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const response = await axios.post('http://127.0.0.1:8000/auth/signin', {
+        email: formData.email,
+        password: formData.password,
+      });
 
-      if (formData.email && formData.password) {
-        console.log('Login successful!');
-        // In a real application, you would handle authentication here (e.g., Firebase Auth)
-        // For demonstration, we'll simulate a token and user storage.
-        localStorage.setItem('authToken', 'simulated-auth-token');
-        localStorage.setItem('user', JSON.stringify({ email: formData.email }));
+      if (response.data?.access_token) {
+        localStorage.setItem('authToken', response.data.access_token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
         navigate('/dashboard');
       } else {
-        setError('Please fill in all fields');
+        setError(response.data?.message || 'Invalid login response');
       }
     } catch (err) {
-      setError('Login failed. Please try again.');
+      setError(
+        err.response?.data?.message || 'Login failed. Please try again.'
+      );
     } finally {
       setIsLoading(false);
     }

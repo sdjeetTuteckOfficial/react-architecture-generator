@@ -1,67 +1,79 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, User } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
 import gunevoLogo from '/public/images/gunevo.svg';
+import * as yup from 'yup';
+
+// Define the validation schema using yup
+const schema = yup.object().shape({
+  firstName: yup.string().required('First Name is required'),
+  lastName: yup.string().required('Last Name is required'),
+  email: yup
+    .string()
+    .email('Invalid email address')
+    .required('Email is required'),
+  password: yup
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .required('Password is required'),
+  confirmPassword: yup
+    .string()
+    .oneOf([yup.ref('password'), null], 'Passwords must match')
+    .required('Confirm Password is required'),
+  acceptTerms: yup
+    .boolean()
+    .oneOf([true], 'You must accept the terms and conditions'),
+});
 
 const SignUp = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    acceptTerms: false,
-  });
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const navigate = useNavigate();
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-  };
+  // Use react-hook-form for form management and validation
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    resolver: yupResolver(schema),
+  });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const onSubmit = async (data) => {
     setIsLoading(true);
-    setError('');
+    setErrorMessage('');
+    console.log('data', data);
+    const new_data = {
+      email: data.email,
+      password: data.password,
+      first_name: data.firstName, // ✅ match your backend
+      last_name: data.lastName, // ✅ match your backend
+    };
+    console.log('new_data', new_data);
 
     try {
-      // Basic validation
-      if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.confirmPassword) {
-        setError('Please fill in all fields');
-        return;
-      }
+      // Axios POST request to the specified endpoint
+      const response = await axios.post(
+        'http://127.0.0.1:8000/auth/signup',
+        new_data
+      );
 
-      if (formData.password !== formData.confirmPassword) {
-        setError('Passwords do not match');
-        return;
-      }
-
-      if (!formData.acceptTerms) {
-        setError('Please accept the terms and conditions');
-        return;
-      }
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      console.log('Registration successful!');
-      // In a real application, you would handle registration here
-      localStorage.setItem('authToken', 'simulated-auth-token');
-      localStorage.setItem('user', JSON.stringify({ 
-        email: formData.email, 
-        firstName: formData.firstName, 
-        lastName: formData.lastName 
-      }));
-      navigate('/dashboard');
+      console.log('Registration successful!', response.data);
+      localStorage.setItem('unregistered-user', JSON.stringify(response.data));
+      // Assuming a successful response, navigate to a new page.
+      // In a real app, you would handle the auth token from the response.
+      navigate('/verify-otp');
     } catch (err) {
-      setError('Registration failed. Please try again.');
+      console.error('Registration failed:', err);
+      // Display a user-friendly error message from the API or a fallback
+      setErrorMessage(
+        err.response?.data?.message || 'Registration failed. Please try again.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -114,6 +126,7 @@ const SignUp = () => {
             </div>
             <div className='mb-2 text-center'>
               <div className='mb-4 text-center'>
+                {/* Note: gunevo.svg is a local file, so we're using a placeholder here */}
                 <img
                   src={gunevoLogo}
                   alt='Gunevo Logo'
@@ -130,32 +143,37 @@ const SignUp = () => {
           </div>
 
           {/* Error Message */}
-          {error && (
+          {(errorMessage || Object.keys(errors).length > 0) && (
             <div className='mb-4 p-3 bg-red-50 border-l-4 border-red-400 text-red-700 text-sm animate-shake rounded-r-lg dark:bg-red-900/20 dark:border-red-600 dark:text-red-300'>
               <div className='flex items-center'>
                 <div className='w-2 h-2 bg-red-400 rounded-full mr-2 animate-pulse'></div>
-                {error}
+                <p>
+                  {errorMessage ||
+                    Object.values(errors)
+                      .map((e) => e.message)
+                      .join(', ')}
+                </p>
               </div>
             </div>
           )}
 
           {/* Form with staggered animations */}
-          <div className='space-y-4'>
+          <form onSubmit={handleSubmit(onSubmit)} className='space-y-4'>
             {/* Name Fields Row */}
-            <div className='grid grid-cols-2 gap-3 animate-slide-up' style={{ animationDelay: '0.1s' }}>
+            <div
+              className='grid grid-cols-2 gap-3 animate-slide-up'
+              style={{ animationDelay: '0.1s' }}
+            >
               <div className='group'>
                 <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                   First Name
                 </label>
                 <input
-                  name='firstName'
                   type='text'
-                  value={formData.firstName}
-                  onChange={handleInputChange}
+                  {...register('firstName')}
                   className='w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 hover:border-gray-300 hover:shadow-md
                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white dark:border-gray-600 text-sm'
                   placeholder='First name'
-                  required
                 />
               </div>
               <div className='group'>
@@ -163,14 +181,11 @@ const SignUp = () => {
                   Last Name
                 </label>
                 <input
-                  name='lastName'
                   type='text'
-                  value={formData.lastName}
-                  onChange={handleInputChange}
+                  {...register('lastName')}
                   className='w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 hover:border-gray-300 hover:shadow-md
                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white dark:border-gray-600 text-sm'
                   placeholder='Last name'
-                  required
                 />
               </div>
             </div>
@@ -188,14 +203,11 @@ const SignUp = () => {
                   <Mail className='h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-all duration-300 group-focus-within:animate-pulse' />
                 </div>
                 <input
-                  name='email'
                   type='email'
-                  value={formData.email}
-                  onChange={handleInputChange}
+                  {...register('email')}
                   className='w-full pl-11 pr-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 hover:border-gray-300 hover:shadow-md
                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white dark:border-gray-600 text-sm'
                   placeholder='Enter your email'
-                  required
                 />
               </div>
             </div>
@@ -213,14 +225,11 @@ const SignUp = () => {
                   <Lock className='h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-all duration-300 group-focus-within:animate-pulse' />
                 </div>
                 <input
-                  name='password'
                   type={showPassword ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={handleInputChange}
+                  {...register('password')}
                   className='w-full pl-11 pr-12 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 hover:border-gray-300 hover:shadow-md
                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white dark:border-gray-600 text-sm'
                   placeholder='Enter your password'
-                  required
                 />
                 <button
                   type='button'
@@ -249,14 +258,11 @@ const SignUp = () => {
                   <Lock className='h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-all duration-300 group-focus-within:animate-pulse' />
                 </div>
                 <input
-                  name='confirmPassword'
                   type={showConfirmPassword ? 'text' : 'password'}
-                  value={formData.confirmPassword}
-                  onChange={handleInputChange}
+                  {...register('confirmPassword')}
                   className='w-full pl-11 pr-12 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 hover:border-gray-300 hover:shadow-md
                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white dark:border-gray-600 text-sm'
                   placeholder='Confirm your password'
-                  required
                 />
                 <button
                   type='button'
@@ -279,10 +285,8 @@ const SignUp = () => {
             >
               <div className='flex items-center h-5'>
                 <input
-                  name='acceptTerms'
                   type='checkbox'
-                  checked={formData.acceptTerms}
-                  onChange={handleInputChange}
+                  {...register('acceptTerms')}
                   className='w-3.5 h-3.5 text-blue-600 border-2 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200
                     dark:bg-gray-600 dark:border-gray-500 dark:checked:bg-blue-600'
                 />
@@ -290,11 +294,17 @@ const SignUp = () => {
               <div className='ml-2'>
                 <span className='text-gray-600 dark:text-gray-400'>
                   I agree to the{' '}
-                  <Link to='/terms' className='text-blue-600 hover:text-blue-800 font-medium transition-colors dark:text-blue-400 dark:hover:text-blue-300'>
+                  <Link
+                    to='/terms'
+                    className='text-blue-600 hover:text-blue-800 font-medium transition-colors dark:text-blue-400 dark:hover:text-blue-300'
+                  >
                     Terms of Service
                   </Link>{' '}
                   and{' '}
-                  <Link to='/privacy' className='text-blue-600 hover:text-blue-800 font-medium transition-colors dark:text-blue-400 dark:hover:text-blue-300'>
+                  <Link
+                    to='/privacy'
+                    className='text-blue-600 hover:text-blue-800 font-medium transition-colors dark:text-blue-400 dark:hover:text-blue-300'
+                  >
                     Privacy Policy
                   </Link>
                 </span>
@@ -303,8 +313,8 @@ const SignUp = () => {
 
             {/* Submit Button */}
             <button
-              onClick={handleSubmit}
-              disabled={isLoading || !formData.acceptTerms}
+              type='submit'
+              disabled={isLoading}
               className='w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold py-2.5 px-4 rounded-xl hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center group shadow-lg hover:shadow-xl animate-slide-up relative overflow-hidden text-sm'
               style={{ animationDelay: '0.6s' }}
             >
@@ -323,7 +333,7 @@ const SignUp = () => {
                 </div>
               )}
             </button>
-          </div>
+          </form>
 
           {/* Footer */}
           <p

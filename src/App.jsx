@@ -13,6 +13,7 @@ import FlowPage from './pages/FlowPage';
 import ProtectedRoute from './route/ProtectedRoute';
 import ChatInterface from './pages/Chatbot';
 import CodeEditor from './pages/code-editor/CodeEditor';
+import OtpPage from './pages/OtpPage';
 import { useSelector } from 'react-redux';
 
 export default function App() {
@@ -26,6 +27,7 @@ export default function App() {
           <Route path='/login' element={<Login />} />
           <Route path='/forgot-password' element={<ForgetPassword />} />
           <Route path='/signup' element={<SignUp />} />
+          <Route path='/verify-otp' element={<OtpPage />} />
 
           {/* Protected Routes */}
           <Route
