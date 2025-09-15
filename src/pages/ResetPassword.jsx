@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Mail, ArrowRight, User } from 'lucide-react'; // Eye, EyeOff, Lock are not needed for forgot password
-import gunevoLogo from '/public/images/gunevo.svg'; // Assuming the logo path is correct
+import { Mail, ArrowRight, Lock, Shield } from 'lucide-react';
 
-const ForgotPassword = () => {
+const ResetPassword = () => {
   const [formData, setFormData] = useState({
     email: '',
+    otp: '',
+    newPassword: '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -18,54 +19,52 @@ const ForgotPassword = () => {
     }));
   };
 
- const handleSubmit = async (e) => {
-  e.preventDefault();
-  setIsLoading(true);
-  setError('');
-  setSuccessMessage('');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    setSuccessMessage('');
 
-  if (!formData.email) {
-    setError('Please enter your email address.');
-    setIsLoading(false);
-    return;
-  }
-
-  try {
-    const response = await fetch('http://localhost:8000/auth/forgot-password', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email: formData.email }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
+    if (!formData.email || !formData.otp || !formData.newPassword) {
+      setError('Please fill in all fields.');
+      setIsLoading(false);
+      return;
     }
 
-    const data = await response.json();
+    try {
+      const response = await fetch('http://localhost:8000/auth/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          otp: formData.otp,
+          new_password: formData.newPassword,
+        }),
+      });
 
-    if (data.message) {
-      setSuccessMessage(data.message);
+      const data = await response.json();
 
-      // ⚠️ Only for development: show OTP
-      if (data.otp) {
-        setSuccessMessage(`${data.message}. OTP: ${data.otp}`);
+      if (response.ok) {
+        setSuccessMessage(data.message || 'Password reset successfully!');
+        setFormData({ email: '', otp: '', newPassword: '' });
+        
+        // Redirect back to login after short delay
+        setTimeout(() => {
+          // In a real app, use navigate("/login") from react-router-dom
+          window.location.href = '/login';
+        }, 2000);
+      } else {
+        setError(data.message || 'Something went wrong');
       }
-
-      setFormData({ email: '' });
-    } else {
-      setError('Unexpected response from server.');
+    } catch (err) {
+      console.error('Reset password error:', err);
+      setError('Failed to reset password. Please try again later.');
+    } finally {
+      setIsLoading(false);
     }
-  } catch (err) {
-    console.error('Forgot password error:', err);
-    setError('Failed to send reset request. Please try again later.');
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-
+  };
 
   return (
     <div
@@ -83,29 +82,29 @@ const ForgotPassword = () => {
           <div className='text-center mb-6'>
             {/* Main Logo with complex animation */}
             <div className='relative w-16 h-16 mx-auto mb-4'>
-              <div className='absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl animate-pulse shadow-lg'></div>
+              <div className='absolute inset-0 bg-gradient-to-br from-green-500 to-blue-600 rounded-2xl animate-pulse shadow-lg'></div>
               <div className='absolute inset-2 bg-white dark:bg-gray-900 rounded-xl flex items-center justify-center'>
                 <div className='relative'>
-                  <User
-                    className='h-5 w-5 text-blue-600 animate-bounce'
+                  <Shield
+                    className='h-5 w-5 text-green-600 animate-bounce'
                     style={{ animationDuration: '2s' }}
                   />
                   {/* Orbiting particles */}
                   <div className='absolute -inset-4'>
                     <div
-                      className='absolute top-0 left-1/2 w-1 h-1 bg-blue-400 rounded-full animate-ping'
+                      className='absolute top-0 left-1/2 w-1 h-1 bg-green-400 rounded-full animate-ping'
                       style={{ animationDelay: '0s' }}
                     ></div>
                     <div
-                      className='absolute top-1/2 right-0 w-1 h-1 bg-purple-400 rounded-full animate-ping'
+                      className='absolute top-1/2 right-0 w-1 h-1 bg-blue-400 rounded-full animate-ping'
                       style={{ animationDelay: '0.5s' }}
                     ></div>
                     <div
-                      className='absolute bottom-0 left-1/2 w-1 h-1 bg-pink-400 rounded-full animate-ping'
+                      className='absolute bottom-0 left-1/2 w-1 h-1 bg-purple-400 rounded-full animate-ping'
                       style={{ animationDelay: '1s' }}
                     ></div>
                     <div
-                      className='absolute top-1/2 left-0 w-1 h-1 bg-green-400 rounded-full animate-ping'
+                      className='absolute top-1/2 left-0 w-1 h-1 bg-yellow-400 rounded-full animate-ping'
                       style={{ animationDelay: '1.5s' }}
                     ></div>
                   </div>
@@ -113,20 +112,18 @@ const ForgotPassword = () => {
               </div>
             </div>
             <div className='mb-2 text-center'>
-              <img
-                src={gunevoLogo}
-                alt='Gunevo Logo'
-                className='w-48 mx-auto'
-              />
+              <div className='text-3xl font-bold bg-gradient-to-r from-green-500 to-blue-600 bg-clip-text text-transparent'>
+                GUNEVO
+              </div>
             </div>
             <h2 className='text-2xl font-bold text-gray-800 dark:text-white mb-2 animate-fade-in'>
-              Forgot Password?
+              Reset Password
             </h2>
             <p
               className='text-gray-500 dark:text-gray-400 animate-fade-in text-sm'
               style={{ animationDelay: '0.2s' }}
             >
-              Enter your email to reset your password
+              Enter your email, OTP, and new password
             </p>
           </div>
 
@@ -176,12 +173,63 @@ const ForgotPassword = () => {
                 />
               </div>
             </div>
+
+            {/* OTP Field */}
+            <div
+              className='group animate-slide-up'
+              style={{ animationDelay: '0.2s' }}
+            >
+              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                OTP Code
+              </label>
+              <div className='relative'>
+                <div className='absolute left-3 top-1/2 transform -translate-y-1/2 transition-all duration-300 group-focus-within:scale-110'>
+                  <Shield className='h-5 w-5 text-gray-400 group-focus-within:text-green-500 transition-all duration-300 group-focus-within:animate-pulse' />
+                </div>
+                <input
+                  name='otp'
+                  type='text'
+                  value={formData.otp}
+                  onChange={handleInputChange}
+                  className='w-full pl-11 pr-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 hover:border-gray-300 hover:shadow-md
+                    bg-white dark:bg-gray-700 text-gray-900 dark:text-white dark:border-gray-600 text-sm'
+                  placeholder='Enter OTP code'
+                  required
+                />
+              </div>
+            </div>
+
+            {/* New Password Field */}
+            <div
+              className='group animate-slide-up'
+              style={{ animationDelay: '0.3s' }}
+            >
+              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                New Password
+              </label>
+              <div className='relative'>
+                <div className='absolute left-3 top-1/2 transform -translate-y-1/2 transition-all duration-300 group-focus-within:scale-110'>
+                  <Lock className='h-5 w-5 text-gray-400 group-focus-within:text-purple-500 transition-all duration-300 group-focus-within:animate-pulse' />
+                </div>
+                <input
+                  name='newPassword'
+                  type='password'
+                  value={formData.newPassword}
+                  onChange={handleInputChange}
+                  className='w-full pl-11 pr-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 hover:border-gray-300 hover:shadow-md
+                    bg-white dark:bg-gray-700 text-gray-900 dark:text-white dark:border-gray-600 text-sm'
+                  placeholder='Enter new password'
+                  required
+                />
+              </div>
+            </div>
+
             {/* Submit Button */}
             <button
               onClick={handleSubmit}
               disabled={isLoading}
-              className='w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold py-2.5 px-4 rounded-xl hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center group shadow-lg hover:shadow-xl animate-slide-up relative overflow-hidden text-sm'
-              style={{ animationDelay: '0.2s' }} // Adjusted delay for single input field
+              className='w-full bg-gradient-to-r from-green-500 to-blue-600 text-white font-semibold py-2.5 px-4 rounded-xl hover:from-green-600 hover:to-blue-700 focus:outline-none focus:ring-4 focus:ring-green-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center group shadow-lg hover:shadow-xl animate-slide-up relative overflow-hidden text-sm'
+              style={{ animationDelay: '0.4s' }}
             >
               {/* Button shine effect */}
               <div className='absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-12'></div>
@@ -189,7 +237,7 @@ const ForgotPassword = () => {
               {isLoading ? (
                 <div className='flex items-center relative z-10'>
                   <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
-                  <span className='animate-pulse'>Sending link...</span>
+                  <span className='animate-pulse'>Resetting...</span>
                 </div>
               ) : (
                 <div className='flex items-center relative z-10'>
@@ -203,7 +251,7 @@ const ForgotPassword = () => {
           {/* Footer */}
           <p
             className='mt-5 text-center text-xs text-gray-600 animate-fade-in dark:text-gray-400'
-            style={{ animationDelay: '0.3s' }} // Adjusted delay
+            style={{ animationDelay: '0.5s' }}
           >
             Remembered your password?{' '}
             {/* Using a regular anchor for demonstration, in a real app use Link from react-router-dom */}
@@ -217,14 +265,14 @@ const ForgotPassword = () => {
           </p>
           <p
             className='mt-2 text-center text-xs text-gray-600 animate-fade-in dark:text-gray-400'
-            style={{ animationDelay: '0.4s' }} // Adjusted delay
+            style={{ animationDelay: '0.6s' }}
           >
-            Don't have an account?{' '}
+            Need to resend OTP?{' '}
             <a
-              href='/signup'
+              href='/forgot-password'
               className='text-blue-600 hover:text-blue-800 font-medium transition-all duration-200 hover:scale-105 inline-block relative group dark:text-blue-400 dark:hover:text-blue-300'
             >
-              Sign up
+              Get new code
               <span className='absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 group-hover:w-full transition-all duration-300'></span>
             </a>
           </p>
@@ -294,4 +342,4 @@ const ForgotPassword = () => {
   );
 };
 
-export default ForgotPassword;
+export default ResetPassword;
