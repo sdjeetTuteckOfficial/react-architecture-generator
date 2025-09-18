@@ -9,6 +9,9 @@ import {
   AlertCircle,
   Sparkles,
   Zap,
+  History,
+  Save,
+  Plus,
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import { setDiagramType } from '../redux/diagramSlice';
@@ -16,6 +19,7 @@ import { setDiagramType } from '../redux/diagramSlice';
 const FloatingChatButton = ({
   apiBaseUrl = 'http://localhost:8000',
   handleGenerateDiagram,
+  userId = '3fa85f64-5717-4562-b3fc-2c963f66afa6',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -32,6 +36,15 @@ const FloatingChatButton = ({
   const [currentAnalysis, setCurrentAnalysis] = useState(null);
   const [clarificationResponses, setClarificationResponses] = useState({});
   const [awaitingClarification, setAwaitingClarification] = useState(false);
+
+  // Thread management states
+  const [currentThreadId, setCurrentThreadId] = useState(null);
+  const [threads, setThreads] = useState([]);
+  const [isLoadingThreads, setIsLoadingThreads] = useState(false);
+  const [showThreads, setShowThreads] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCreatingThread, setIsCreatingThread] = useState(false);
+
   const diagramType = useSelector((state) => state.diagram.diagramType);
   const dispatch = useDispatch();
   const messagesEndRef = useRef(null);
@@ -51,9 +64,16 @@ const FloatingChatButton = ({
     }
   }, [isOpen]);
 
+  // Load threads when chat opens
+  useEffect(() => {
+    if (isOpen && userId) {
+      loadThreads();
+    }
+  }, [isOpen, userId]);
+
   const addMessage = (type, content, isError = false) => {
     const newMessage = {
-      id: Date.now(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type,
       content,
       timestamp: new Date(),
@@ -61,6 +81,212 @@ const FloatingChatButton = ({
     };
     setMessages((prev) => [...prev, newMessage]);
     return newMessage;
+  };
+
+  // Utility function to generate or validate UUID
+  const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
+      /[xy]/g,
+      function (c) {
+        const r = (Math.random() * 16) | 0;
+        const v = c == 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      }
+    );
+  };
+
+  const validateAndFormatUserId = (id) => {
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(id)) {
+      return id;
+    }
+
+    const storedUUID = localStorage.getItem(`user_uuid_${id}`);
+    if (storedUUID && uuidRegex.test(storedUUID)) {
+      return storedUUID;
+    }
+
+    const newUUID = generateUUID();
+    localStorage.setItem(`user_uuid_${id}`, newUUID);
+    return newUUID;
+  };
+
+  const getFormattedUserId = () => {
+    if (!userId) return null;
+    return validateAndFormatUserId(userId);
+  };
+
+  // API Functions for Thread Management
+  const loadThreads = async () => {
+    const formattedUserId = getFormattedUserId();
+    if (!formattedUserId) return;
+
+    setIsLoadingThreads(true);
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/threads?user_id=${formattedUserId}&skip=0&limit=100`
+      );
+      if (response.ok) {
+        const threadsData = await response.json();
+        setThreads(threadsData);
+      } else {
+        console.error(
+          'Failed to load threads:',
+          response.status,
+          response.statusText
+        );
+        addMessage('bot', '⚠️ Failed to load chat history', true);
+      }
+    } catch (error) {
+      console.error('Error loading threads:', error);
+      addMessage('bot', '⚠️ Failed to load chat history', true);
+    } finally {
+      setIsLoadingThreads(false);
+    }
+  };
+
+  const createThread = async () => {
+    const formattedUserId = getFormattedUserId();
+    if (!formattedUserId || isCreatingThread) return null;
+
+    setIsCreatingThread(true);
+    console.log('Creating thread...');
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/threads`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: formattedUserId,
+          thread_name: `${
+            diagramType === 'architecture' ? 'Architecture' : 'Database'
+          } Chat - ${new Date().toLocaleString()}`,
+          diagram_type: diagramType,
+        }),
+      });
+
+      if (response.ok) {
+        const thread = await response.json();
+        const threadId = thread.thread_id || thread.id;
+
+        console.log('Thread created successfully:', threadId);
+        setCurrentThreadId(threadId);
+        setThreads((prev) => [thread, ...prev]);
+
+        return threadId;
+      } else {
+        console.error(
+          'Failed to create thread:',
+          response.status,
+          response.statusText
+        );
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error details:', errorData);
+        addMessage('bot', '⚠️ Failed to create new chat thread', true);
+      }
+    } catch (error) {
+      console.error('Error creating thread:', error);
+      addMessage('bot', '⚠️ Failed to create new chat thread', true);
+    } finally {
+      setIsCreatingThread(false);
+    }
+    return null;
+  };
+
+  const saveConversation = async (threadId, diagramData = null) => {
+    const formattedUserId = getFormattedUserId();
+    if (!threadId || !formattedUserId) {
+      console.warn('Cannot save conversation: missing threadId or userId', {
+        threadId,
+        formattedUserId,
+      });
+      return;
+    }
+
+    console.log('Saving conversation to thread:', threadId);
+    setIsSaving(true);
+
+    try {
+      const conversationData = {
+        thread_id: threadId,
+        version: 0,
+        messages: messages.map((msg) => ({
+          type: msg.type,
+          content: msg.content,
+          timestamp: msg.timestamp.toISOString(),
+        })),
+      };
+
+      if (diagramData) {
+        conversationData.diagram_json = diagramData;
+      }
+
+      const response = await fetch(
+        `${apiBaseUrl}/threads/${threadId}/conversations`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(conversationData),
+        }
+      );
+
+      if (response.ok) {
+        console.log('Conversation saved successfully');
+        addMessage('bot', '💾 Conversation saved successfully!');
+      } else {
+        console.error(
+          'Failed to save conversation:',
+          response.status,
+          response.statusText
+        );
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Save error details:', errorData);
+        addMessage('bot', '⚠️ Failed to save conversation', true);
+      }
+    } catch (error) {
+      console.error('Error saving conversation:', error);
+      addMessage('bot', '⚠️ Failed to save conversation', true);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadThread = async (threadId) => {
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/threads/${threadId}/conversations`
+      );
+      if (response.ok) {
+        const conversations = await response.json();
+        if (conversations.length > 0) {
+          const latestConversation = conversations[conversations.length - 1];
+          const loadedMessages = latestConversation.messages.map(
+            (msg, index) => ({
+              id: index + 1,
+              type: msg.type,
+              content: msg.content,
+              timestamp: new Date(msg.timestamp),
+            })
+          );
+          setMessages(loadedMessages);
+          setCurrentThreadId(threadId);
+          setShowThreads(false);
+
+          // If there's diagram data, load it
+          if (latestConversation.diagram_json && handleGenerateDiagram) {
+            handleGenerateDiagram(latestConversation.diagram_json);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading thread:', error);
+      addMessage('bot', '⚠️ Failed to load conversation', true);
+    }
   };
 
   const analyzeProject = async (description) => {
@@ -109,11 +335,33 @@ const FloatingChatButton = ({
       }
 
       const res = await response.json();
-      handleGenerateDiagram(res);
+      if (handleGenerateDiagram) {
+        handleGenerateDiagram(res);
+      }
+      return res;
     } catch (error) {
       console.error('Error generating diagram:', error);
       throw error;
     }
+  };
+
+  const ensureThreadExists = async () => {
+    if (currentThreadId) {
+      console.log('Thread already exists:', currentThreadId);
+      return currentThreadId;
+    }
+
+    if (!userId) {
+      console.warn('No userId provided, cannot create thread');
+      return null;
+    }
+
+    console.log('Creating new thread...');
+    const threadId = await createThread();
+    if (threadId) {
+      console.log('Thread created and set:', threadId);
+    }
+    return threadId;
   };
 
   const handleSubmit = async (e) => {
@@ -146,6 +394,9 @@ const FloatingChatButton = ({
             `🎨 Perfect! I have everything I need. Crafting your ${diagramType} diagram with some AI magic...`
           );
 
+          // Ensure thread exists before generating diagram
+          const threadId = await ensureThreadExists();
+
           const diagramData = await generateDiagram(
             currentAnalysis.original_description,
             currentAnalysis.extracted_context,
@@ -158,14 +409,30 @@ const FloatingChatButton = ({
             `🚀 Boom! Your ${
               diagramType === 'architecture' ? 'architecture' : 'database'
             } diagram is ready! Created ${
-              diagramData.nodes.length
+              diagramData.nodes?.length || 0
             } components with ${
-              diagramData.edges.length
+              diagramData.edges?.length || 0
             } smart connections. Check it out in your main workspace!`
           );
 
+          // Save conversation with diagram data
+          if (threadId) {
+            console.log(
+              'Saving conversation with diagram data to thread:',
+              threadId
+            );
+            await saveConversation(threadId, diagramData);
+          } else {
+            console.warn('No thread ID available for saving conversation');
+            addMessage(
+              'bot',
+              '⚠️ Diagram created but conversation not saved - failed to create thread'
+            );
+          }
+
           // Trigger diagram update in parent component if callback provided
           if (window.updateDiagramFromChat) {
+            console.log('Updating parent diagram via window callback');
             window.updateDiagramFromChat(diagramData);
           }
         } else {
@@ -177,7 +444,9 @@ const FloatingChatButton = ({
           );
         }
       } else {
-        // Initial analysis
+        // Initial analysis - ensure thread exists first
+        const threadId = await ensureThreadExists();
+
         const analysis = await analyzeProject(userMessage);
         setCurrentAnalysis({
           ...analysis,
@@ -214,23 +483,39 @@ const FloatingChatButton = ({
             'bot',
             `✅ Done! Your ${
               diagramType === 'architecture' ? 'architecture' : 'database'
-            } diagram is live with ${diagramData.nodes.length} components and ${
-              diagramData.edges.length
-            } connections!`
+            } diagram is live with ${
+              diagramData.nodes?.length || 0
+            } components and ${diagramData.edges?.length || 0} connections!`
           );
 
+          // Save conversation with diagram data
+          if (threadId) {
+            console.log(
+              'Saving conversation with diagram data to thread:',
+              threadId
+            );
+            await saveConversation(threadId, diagramData);
+          } else {
+            console.warn('No thread ID available for saving conversation');
+            addMessage(
+              'bot',
+              '⚠️ Diagram created but conversation not saved - failed to create thread'
+            );
+          }
+
           if (window.updateDiagramFromChat) {
+            console.log('Updating parent diagram via window callback');
             window.updateDiagramFromChat(diagramData);
           }
         }
       }
     } catch (error) {
       console.error('Error during chat submission:', error);
-      // addMessage(
-      //   'bot',
-      //   `💥 Oops! Something went wrong: ${error.message}. Let's try that again!`,
-      //   true
-      // );
+      addMessage(
+        'bot',
+        `💥 Oops! Something went wrong: ${error.message}. Let's try that again!`,
+        true
+      );
     } finally {
       setIsLoading(false);
     }
@@ -252,15 +537,37 @@ const FloatingChatButton = ({
     setCurrentAnalysis(null);
     setClarificationResponses({});
     setAwaitingClarification(false);
+    setCurrentThreadId(null);
     setMessages([
       {
-        id: Date.now(),
+        id: `${Date.now()}-reset`,
         type: 'bot',
         content:
           "🔥 Fresh start! Tell me about your project and let's build something amazing together!",
         timestamp: new Date(),
       },
     ]);
+  };
+
+  const handleNewChat = () => {
+    handleReset();
+    setShowThreads(false);
+  };
+
+  const handleSaveCurrentChat = async () => {
+    // Ensure thread exists before saving
+    const threadId = await ensureThreadExists();
+
+    // Save the conversation
+    if (threadId) {
+      await saveConversation(threadId);
+    } else {
+      addMessage(
+        'bot',
+        '⚠️ Unable to save chat - failed to create thread',
+        true
+      );
+    }
   };
 
   return (
@@ -272,7 +579,6 @@ const FloatingChatButton = ({
             isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'
           }`}
         >
-          {console.log('Diagram type:', diagramType)}
           {/* Pulse Rings */}
           <div className='absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 animate-ping opacity-20'></div>
           <div className='absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 animate-pulse opacity-30'></div>
@@ -323,17 +629,108 @@ const FloatingChatButton = ({
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className='w-8 h-8 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-all duration-200 flex items-center justify-center group'
-              >
-                <X
-                  size={18}
-                  className='text-white group-hover:rotate-90 transition-transform duration-200'
-                />
-              </button>
+              <div className='flex items-center space-x-2'>
+                {/* Thread History Button */}
+                <button
+                  onClick={() => setShowThreads(!showThreads)}
+                  className='w-8 h-8 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-all duration-200 flex items-center justify-center group'
+                  title='Chat History'
+                >
+                  <History
+                    size={16}
+                    className='text-white group-hover:scale-110 transition-transform duration-200'
+                  />
+                </button>
+                {/* Save Button */}
+                {userId && (
+                  <button
+                    onClick={handleSaveCurrentChat}
+                    disabled={isSaving || isCreatingThread}
+                    className='w-8 h-8 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-all duration-200 flex items-center justify-center group disabled:opacity-50'
+                    title='Save Chat'
+                  >
+                    {isSaving || isCreatingThread ? (
+                      <Loader2 size={16} className='text-white animate-spin' />
+                    ) : (
+                      <Save
+                        size={16}
+                        className='text-white group-hover:scale-110 transition-transform duration-200'
+                      />
+                    )}
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className='w-8 h-8 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-all duration-200 flex items-center justify-center group'
+                >
+                  <X
+                    size={18}
+                    className='text-white group-hover:rotate-90 transition-transform duration-200'
+                  />
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Thread History Sidebar */}
+          {showThreads && (
+            <div className='bg-gradient-to-b from-gray-50 to-white border-b border-gray-200 max-h-48 overflow-y-auto'>
+              <div className='p-4'>
+                <div className='flex items-center justify-between mb-3'>
+                  <h4 className='font-semibold text-gray-800 flex items-center gap-2'>
+                    <History size={16} />
+                    Chat History
+                  </h4>
+                  <button
+                    onClick={handleNewChat}
+                    className='flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm'
+                  >
+                    <Plus size={14} />
+                    New Chat
+                  </button>
+                </div>
+                {isLoadingThreads ? (
+                  <div className='flex items-center justify-center py-4'>
+                    <Loader2 size={20} className='animate-spin text-gray-500' />
+                  </div>
+                ) : threads.length > 0 ? (
+                  <div className='space-y-2'>
+                    {threads.map((thread) => (
+                      <button
+                        key={thread.thread_id || thread.id}
+                        onClick={() =>
+                          loadThread(thread.thread_id || thread.id)
+                        }
+                        className={`w-full text-left p-3 rounded-lg transition-all duration-200 ${
+                          currentThreadId === (thread.thread_id || thread.id)
+                            ? 'bg-blue-100 border-2 border-blue-300'
+                            : 'bg-white border border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className='font-medium text-sm text-gray-800 truncate'>
+                          {thread.thread_name ||
+                            thread.title ||
+                            'Untitled Chat'}
+                        </div>
+                        <div className='text-xs text-gray-500 mt-1'>
+                          {new Date(
+                            thread.created_at || Date.now()
+                          ).toLocaleString()}
+                        </div>
+                        <div className='text-xs text-blue-600 mt-1 capitalize'>
+                          {thread.diagram_type || 'architecture'}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className='text-gray-500 text-sm text-center py-4'>
+                    No previous chats found
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Mode Selector with Pills */}
           <div className='p-4 bg-gradient-to-r from-gray-50 to-blue-50/50 border-b border-gray-100/50'>
@@ -522,6 +919,22 @@ const FloatingChatButton = ({
                 </div>
               </div>
             )}
+            {/* Thread Status Indicator */}
+            <div className='mt-2 flex items-center justify-between text-xs text-gray-500'>
+              <span className='flex items-center gap-1'>
+                {currentThreadId ? (
+                  <>💾 Thread: {String(currentThreadId).slice(0, 8)}...</>
+                ) : (
+                  <>📝 New conversation</>
+                )}
+              </span>
+              {(isSaving || isCreatingThread) && (
+                <span className='flex items-center gap-1'>
+                  <Loader2 size={12} className='animate-spin' />
+                  {isCreatingThread ? 'Creating thread...' : 'Saving...'}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}
