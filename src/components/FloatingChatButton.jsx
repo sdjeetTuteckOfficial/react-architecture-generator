@@ -44,6 +44,9 @@ const FloatingChatButton = ({
   const [showThreads, setShowThreads] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreatingThread, setIsCreatingThread] = useState(false);
+  const [currentVersion, setCurrentVersion] = useState(0);
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const [hasGeneratedDiagram, setHasGeneratedDiagram] = useState(false);
 
   const diagramType = useSelector((state) => state.diagram.diagramType);
   const dispatch = useDispatch();
@@ -206,23 +209,25 @@ const FloatingChatButton = ({
       return;
     }
 
-    console.log('Saving conversation to thread:', threadId);
+    console.log(
+      'Saving conversation to thread:',
+      threadId,
+      'version:',
+      currentVersion
+    );
     setIsSaving(true);
 
     try {
       const conversationData = {
         thread_id: threadId,
-        version: 0,
+        version: currentVersion,
+        diagram_json: diagramData || {}, // Always include diagram_json as it's required
         messages: messages.map((msg) => ({
           type: msg.type,
           content: msg.content,
           timestamp: msg.timestamp.toISOString(),
         })),
       };
-
-      if (diagramData) {
-        conversationData.diagram_json = diagramData;
-      }
 
       const response = await fetch(
         `${apiBaseUrl}/threads/${threadId}/conversations`,
@@ -236,8 +241,17 @@ const FloatingChatButton = ({
       );
 
       if (response.ok) {
-        console.log('Conversation saved successfully');
-        addMessage('bot', '💾 Conversation saved successfully!');
+        const savedConversation = await response.json();
+        console.log('Conversation saved successfully:', savedConversation);
+
+        // Update current version and add to history
+        setCurrentVersion(currentVersion + 1);
+        setConversationHistory((prev) => [...prev, savedConversation]);
+
+        addMessage(
+          'bot',
+          `💾 Conversation saved successfully! (Version ${savedConversation.version})`
+        );
       } else {
         console.error(
           'Failed to save conversation:',
@@ -263,25 +277,62 @@ const FloatingChatButton = ({
       );
       if (response.ok) {
         const conversations = await response.json();
+        setConversationHistory(conversations);
+
         if (conversations.length > 0) {
-          const latestConversation = conversations[conversations.length - 1];
-          const loadedMessages = latestConversation.messages.map(
-            (msg, index) => ({
-              id: index + 1,
-              type: msg.type,
-              content: msg.content,
-              timestamp: new Date(msg.timestamp),
-            })
+          // Sort conversations by version to get the latest one
+          const sortedConversations = conversations.sort(
+            (a, b) => b.version - a.version
           );
+          const latestConversation = sortedConversations[0];
+
+          // Mark that we've generated a diagram since we're loading an existing thread
+          setHasGeneratedDiagram(true);
+
+          // Load messages from diagram_json metadata if available, otherwise create default messages
+          let loadedMessages;
+          if (
+            latestConversation.diagram_json &&
+            latestConversation.diagram_json.messages
+          ) {
+            loadedMessages = latestConversation.diagram_json.messages.map(
+              (msg, index) => ({
+                id: `loaded-${index}`,
+                type: msg.type,
+                content: msg.content,
+                timestamp: new Date(msg.timestamp),
+              })
+            );
+          } else {
+            // Create a default message for threads without stored messages
+            loadedMessages = [
+              {
+                id: 'loaded-welcome',
+                type: 'bot',
+                content: `🔄 Conversation loaded from version ${latestConversation.version}! Your diagram has been restored. You can continue the conversation or ask for updates.`,
+                timestamp: new Date(latestConversation.created_at),
+              },
+            ];
+          }
+
           setMessages(loadedMessages);
           setCurrentThreadId(threadId);
+          setCurrentVersion(latestConversation.version + 1);
           setShowThreads(false);
 
-          // If there's diagram data, load it
+          // Load the diagram data
           if (latestConversation.diagram_json && handleGenerateDiagram) {
             handleGenerateDiagram(latestConversation.diagram_json);
           }
+
+          addMessage(
+            'bot',
+            `🔄 Ready to continue! Current version: ${latestConversation.version}. What would you like to update?`
+          );
         }
+      } else {
+        console.error('Failed to load conversations:', response.status);
+        addMessage('bot', '⚠️ Failed to load conversation history', true);
       }
     } catch (error) {
       console.error('Error loading thread:', error);
@@ -538,6 +589,9 @@ const FloatingChatButton = ({
     setClarificationResponses({});
     setAwaitingClarification(false);
     setCurrentThreadId(null);
+    setCurrentVersion(0);
+    setConversationHistory([]);
+    setHasGeneratedDiagram(false); // Reset the flag
     setMessages([
       {
         id: `${Date.now()}-reset`,
@@ -874,6 +928,8 @@ const FloatingChatButton = ({
                 placeholder={
                   awaitingClarification
                     ? '🤔 Your answer...'
+                    : currentThreadId
+                    ? '💬 Continue the conversation or ask for updates...'
                     : '✨ Describe your dream project...'
                 }
                 className='flex-1 border-2 border-gray-200/50 rounded-2xl px-4 py-3 text-sm bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all duration-200 placeholder:text-gray-500'
@@ -923,7 +979,10 @@ const FloatingChatButton = ({
             <div className='mt-2 flex items-center justify-between text-xs text-gray-500'>
               <span className='flex items-center gap-1'>
                 {currentThreadId ? (
-                  <>💾 Thread: {String(currentThreadId).slice(0, 8)}...</>
+                  <>
+                    💾 Thread: {String(currentThreadId).slice(0, 8)}... (v
+                    {currentVersion})
+                  </>
                 ) : (
                   <>📝 New conversation</>
                 )}
@@ -935,6 +994,16 @@ const FloatingChatButton = ({
                 </span>
               )}
             </div>
+            {/* Conversation Help Text */}
+            {currentThreadId && !awaitingClarification && (
+              <div className='mt-2 text-xs text-blue-600 bg-blue-50 rounded-lg p-2'>
+                💡 You can now ask me to update, modify, or enhance your
+                diagram!
+                <br />
+                Try: "Add authentication", "Make it more scalable", "Add a cache
+                layer"
+              </div>
+            )}
           </div>
         </div>
       )}
