@@ -9,6 +9,9 @@ import {
   AlertCircle,
   Sparkles,
   Zap,
+  History,
+  Save,
+  Plus,
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import { setDiagramType } from '../redux/diagramSlice';
@@ -16,7 +19,9 @@ import { setDiagramType } from '../redux/diagramSlice';
 const FloatingChatButton = ({
   apiBaseUrl = 'http://localhost:8000',
   handleGenerateDiagram,
+  userId = '3fa85f64-5717-4562-b3fc-2c963f66afa6',
 }) => {
+  const token = localStorage.getItem('authToken');
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
@@ -32,6 +37,18 @@ const FloatingChatButton = ({
   const [currentAnalysis, setCurrentAnalysis] = useState(null);
   const [clarificationResponses, setClarificationResponses] = useState({});
   const [awaitingClarification, setAwaitingClarification] = useState(false);
+
+  // Thread management states
+  const [currentThreadId, setCurrentThreadId] = useState(null);
+  const [threads, setThreads] = useState([]);
+  const [isLoadingThreads, setIsLoadingThreads] = useState(false);
+  const [showThreads, setShowThreads] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCreatingThread, setIsCreatingThread] = useState(false);
+  const [currentVersion, setCurrentVersion] = useState(0);
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const [hasGeneratedDiagram, setHasGeneratedDiagram] = useState(false);
+
   const diagramType = useSelector((state) => state.diagram.diagramType);
   const dispatch = useDispatch();
   const messagesEndRef = useRef(null);
@@ -51,9 +68,16 @@ const FloatingChatButton = ({
     }
   }, [isOpen]);
 
+  // Load threads when chat opens
+  useEffect(() => {
+    if (isOpen && token) {
+      loadThreads();
+    }
+  }, [isOpen, token]);
+
   const addMessage = (type, content, isError = false) => {
     const newMessage = {
-      id: Date.now(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type,
       content,
       timestamp: new Date(),
@@ -63,11 +87,247 @@ const FloatingChatButton = ({
     return newMessage;
   };
 
-  const analyzeProject = async (description) => {
+  // API Functions for Thread Management
+  const loadThreads = async () => {
+    if (!token) {
+      console.warn('No auth token available');
+      return;
+    }
+
+    setIsLoadingThreads(true);
     try {
-      const response = await fetch(`${apiBaseUrl}/analyze`, {
+      // FIXED: Remove user_id parameter - backend gets it from token
+      const response = await fetch(
+        `${apiBaseUrl}/architecture/threads?skip=0&limit=100`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      if (response.ok) {
+        const threadsData = await response.json();
+        setThreads(threadsData);
+      } else {
+        console.error(
+          'Failed to load threads:',
+          response.status,
+          response.statusText
+        );
+        addMessage('bot', '⚠️ Failed to load chat history', true);
+      }
+    } catch (error) {
+      console.error('Error loading threads:', error);
+      addMessage('bot', '⚠️ Failed to load chat history', true);
+    } finally {
+      setIsLoadingThreads(false);
+    }
+  };
+
+  const createThread = async () => {
+    if (!token || isCreatingThread) return null;
+
+    setIsCreatingThread(true);
+    console.log('Creating thread...');
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/architecture/threads`, {
         method: 'POST',
         headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        // FIXED: Remove user_id from body - backend sets it from token
+        body: JSON.stringify({
+          thread_name: `${
+            diagramType === 'architecture' ? 'Architecture' : 'Database'
+          } Chat - ${new Date().toLocaleString()}`,
+          diagram_type: diagramType,
+        }),
+      });
+
+      if (response.ok) {
+        const thread = await response.json();
+        const threadId = thread.thread_id || thread.id;
+
+        console.log('Thread created successfully:', threadId);
+        setCurrentThreadId(threadId);
+        setThreads((prev) => [thread, ...prev]);
+
+        return threadId;
+      } else {
+        console.error(
+          'Failed to create thread:',
+          response.status,
+          response.statusText
+        );
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error details:', errorData);
+        addMessage('bot', '⚠️ Failed to create new chat thread', true);
+      }
+    } catch (error) {
+      console.error('Error creating thread:', error);
+      addMessage('bot', '⚠️ Failed to create new chat thread', true);
+    } finally {
+      setIsCreatingThread(false);
+    }
+    return null;
+  };
+
+  const saveConversation = async (threadId, diagramData = null) => {
+    if (!threadId || !token) {
+      console.warn('Cannot save conversation: missing threadId or token', {
+        threadId,
+        hasToken: !!token,
+      });
+      return;
+    }
+
+    console.log(
+      'Saving conversation to thread:',
+      threadId,
+      'version:',
+      currentVersion
+    );
+    setIsSaving(true);
+
+    try {
+      const conversationData = {
+        thread_id: threadId,
+        version: currentVersion,
+        diagram_json: diagramData || {}, // Always include diagram_json as it's required
+        messages: messages.map((msg) => ({
+          type: msg.type,
+          content: msg.content,
+          timestamp: msg.timestamp.toISOString(),
+        })),
+      };
+
+      const response = await fetch(
+        `${apiBaseUrl}/architecture/threads/${threadId}/conversations`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(conversationData),
+        }
+      );
+
+      if (response.ok) {
+        const savedConversation = await response.json();
+        console.log('Conversation saved successfully:', savedConversation);
+
+        // Update current version and add to history
+        setCurrentVersion(currentVersion + 1);
+        setConversationHistory((prev) => [...prev, savedConversation]);
+
+        addMessage(
+          'bot',
+          `💾 Conversation saved successfully! (Version ${savedConversation.version})`
+        );
+      } else {
+        console.error(
+          'Failed to save conversation:',
+          response.status,
+          response.statusText
+        );
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Save error details:', errorData);
+        addMessage('bot', '⚠️ Failed to save conversation', true);
+      }
+    } catch (error) {
+      console.error('Error saving conversation:', error);
+      addMessage('bot', '⚠️ Failed to save conversation', true);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadThread = async (threadId) => {
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/architecture/threads/${threadId}/conversations`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      if (response.ok) {
+        const conversations = await response.json();
+        setConversationHistory(conversations);
+
+        if (conversations.length > 0) {
+          // Sort conversations by version to get the latest one
+          const sortedConversations = conversations.sort(
+            (a, b) => b.version - a.version
+          );
+          const latestConversation = sortedConversations[0];
+
+          // Mark that we've generated a diagram since we're loading an existing thread
+          setHasGeneratedDiagram(true);
+
+          // Load messages from diagram_json metadata if available, otherwise create default messages
+          let loadedMessages;
+          if (
+            latestConversation.diagram_json &&
+            latestConversation.diagram_json.messages
+          ) {
+            loadedMessages = latestConversation.diagram_json.messages.map(
+              (msg, index) => ({
+                id: `loaded-${index}`,
+                type: msg.type,
+                content: msg.content,
+                timestamp: new Date(msg.timestamp),
+              })
+            );
+          } else {
+            // Create a default message for threads without stored messages
+            loadedMessages = [
+              {
+                id: 'loaded-welcome',
+                type: 'bot',
+                content: `🔄 Conversation loaded from version ${latestConversation.version}! Your diagram has been restored. You can continue the conversation or ask for updates.`,
+                timestamp: new Date(latestConversation.created_at),
+              },
+            ];
+          }
+
+          setMessages(loadedMessages);
+          setCurrentThreadId(threadId);
+          setCurrentVersion(latestConversation.version + 1);
+          setShowThreads(false);
+
+          // Load the diagram data
+          if (latestConversation.diagram_json && handleGenerateDiagram) {
+            handleGenerateDiagram(latestConversation.diagram_json);
+          }
+
+          addMessage(
+            'bot',
+            `🔄 Ready to continue! Current version: ${latestConversation.version}. What would you like to update?`
+          );
+        }
+      } else {
+        console.error('Failed to load conversations:', response.status);
+        addMessage('bot', '⚠️ Failed to load conversation history', true);
+      }
+    } catch (error) {
+      console.error('Error loading thread:', error);
+      addMessage('bot', '⚠️ Failed to load conversation', true);
+    }
+  };
+
+  const analyzeProject = async (description) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/architecture/analyze`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ description }),
@@ -91,29 +351,55 @@ const FloatingChatButton = ({
     type = 'architecture'
   ) => {
     try {
-      const response = await fetch(`${apiBaseUrl}/generate-diagram`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          description,
-          context: context || {},
-          clarification_responses: responses || {},
-          diagram_type: type,
-        }),
-      });
+      const response = await fetch(
+        `${apiBaseUrl}/architecture/generate-diagram`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            description,
+            context: context || {},
+            clarification_responses: responses || {},
+            diagram_type: type,
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const res = await response.json();
-      handleGenerateDiagram(res);
+      if (handleGenerateDiagram) {
+        handleGenerateDiagram(res);
+      }
+      return res;
     } catch (error) {
       console.error('Error generating diagram:', error);
       throw error;
     }
+  };
+
+  const ensureThreadExists = async () => {
+    if (currentThreadId) {
+      console.log('Thread already exists:', currentThreadId);
+      return currentThreadId;
+    }
+
+    if (!token) {
+      console.warn('No auth token provided, cannot create thread');
+      return null;
+    }
+
+    console.log('Creating new thread...');
+    const threadId = await createThread();
+    if (threadId) {
+      console.log('Thread created and set:', threadId);
+    }
+    return threadId;
   };
 
   const handleSubmit = async (e) => {
@@ -146,6 +432,9 @@ const FloatingChatButton = ({
             `🎨 Perfect! I have everything I need. Crafting your ${diagramType} diagram with some AI magic...`
           );
 
+          // Ensure thread exists before generating diagram
+          const threadId = await ensureThreadExists();
+
           const diagramData = await generateDiagram(
             currentAnalysis.original_description,
             currentAnalysis.extracted_context,
@@ -158,14 +447,30 @@ const FloatingChatButton = ({
             `🚀 Boom! Your ${
               diagramType === 'architecture' ? 'architecture' : 'database'
             } diagram is ready! Created ${
-              diagramData.nodes.length
+              diagramData.nodes?.length || 0
             } components with ${
-              diagramData.edges.length
+              diagramData.edges?.length || 0
             } smart connections. Check it out in your main workspace!`
           );
 
+          // Save conversation with diagram data
+          if (threadId) {
+            console.log(
+              'Saving conversation with diagram data to thread:',
+              threadId
+            );
+            await saveConversation(threadId, diagramData);
+          } else {
+            console.warn('No thread ID available for saving conversation');
+            addMessage(
+              'bot',
+              '⚠️ Diagram created but conversation not saved - failed to create thread'
+            );
+          }
+
           // Trigger diagram update in parent component if callback provided
           if (window.updateDiagramFromChat) {
+            console.log('Updating parent diagram via window callback');
             window.updateDiagramFromChat(diagramData);
           }
         } else {
@@ -177,7 +482,9 @@ const FloatingChatButton = ({
           );
         }
       } else {
-        // Initial analysis
+        // Initial analysis - ensure thread exists first
+        const threadId = await ensureThreadExists();
+
         const analysis = await analyzeProject(userMessage);
         setCurrentAnalysis({
           ...analysis,
@@ -214,23 +521,39 @@ const FloatingChatButton = ({
             'bot',
             `✅ Done! Your ${
               diagramType === 'architecture' ? 'architecture' : 'database'
-            } diagram is live with ${diagramData.nodes.length} components and ${
-              diagramData.edges.length
-            } connections!`
+            } diagram is live with ${
+              diagramData.nodes?.length || 0
+            } components and ${diagramData.edges?.length || 0} connections!`
           );
 
+          // Save conversation with diagram data
+          if (threadId) {
+            console.log(
+              'Saving conversation with diagram data to thread:',
+              threadId
+            );
+            await saveConversation(threadId, diagramData);
+          } else {
+            console.warn('No thread ID available for saving conversation');
+            addMessage(
+              'bot',
+              '⚠️ Diagram created but conversation not saved - failed to create thread'
+            );
+          }
+
           if (window.updateDiagramFromChat) {
+            console.log('Updating parent diagram via window callback');
             window.updateDiagramFromChat(diagramData);
           }
         }
       }
     } catch (error) {
       console.error('Error during chat submission:', error);
-      // addMessage(
-      //   'bot',
-      //   `💥 Oops! Something went wrong: ${error.message}. Let's try that again!`,
-      //   true
-      // );
+      addMessage(
+        'bot',
+        `💥 Oops! Something went wrong: ${error.message}. Let's try that again!`,
+        true
+      );
     } finally {
       setIsLoading(false);
     }
@@ -252,15 +575,40 @@ const FloatingChatButton = ({
     setCurrentAnalysis(null);
     setClarificationResponses({});
     setAwaitingClarification(false);
+    setCurrentThreadId(null);
+    setCurrentVersion(0);
+    setConversationHistory([]);
+    setHasGeneratedDiagram(false); // Reset the flag
     setMessages([
       {
-        id: Date.now(),
+        id: `${Date.now()}-reset`,
         type: 'bot',
         content:
           "🔥 Fresh start! Tell me about your project and let's build something amazing together!",
         timestamp: new Date(),
       },
     ]);
+  };
+
+  const handleNewChat = () => {
+    handleReset();
+    setShowThreads(false);
+  };
+
+  const handleSaveCurrentChat = async () => {
+    // Ensure thread exists before saving
+    const threadId = await ensureThreadExists();
+
+    // Save the conversation
+    if (threadId) {
+      await saveConversation(threadId);
+    } else {
+      addMessage(
+        'bot',
+        '⚠️ Unable to save chat - failed to create thread',
+        true
+      );
+    }
   };
 
   return (
@@ -272,7 +620,6 @@ const FloatingChatButton = ({
             isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'
           }`}
         >
-          {console.log('Diagram type:', diagramType)}
           {/* Pulse Rings */}
           <div className='absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 animate-ping opacity-20'></div>
           <div className='absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 animate-pulse opacity-30'></div>
@@ -323,17 +670,108 @@ const FloatingChatButton = ({
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className='w-8 h-8 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-all duration-200 flex items-center justify-center group'
-              >
-                <X
-                  size={18}
-                  className='text-white group-hover:rotate-90 transition-transform duration-200'
-                />
-              </button>
+              <div className='flex items-center space-x-2'>
+                {/* Thread History Button */}
+                <button
+                  onClick={() => setShowThreads(!showThreads)}
+                  className='w-8 h-8 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-all duration-200 flex items-center justify-center group'
+                  title='Chat History'
+                >
+                  <History
+                    size={16}
+                    className='text-white group-hover:scale-110 transition-transform duration-200'
+                  />
+                </button>
+                {/* Save Button */}
+                {token && (
+                  <button
+                    onClick={handleSaveCurrentChat}
+                    disabled={isSaving || isCreatingThread}
+                    className='w-8 h-8 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-all duration-200 flex items-center justify-center group disabled:opacity-50'
+                    title='Save Chat'
+                  >
+                    {isSaving || isCreatingThread ? (
+                      <Loader2 size={16} className='text-white animate-spin' />
+                    ) : (
+                      <Save
+                        size={16}
+                        className='text-white group-hover:scale-110 transition-transform duration-200'
+                      />
+                    )}
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className='w-8 h-8 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-all duration-200 flex items-center justify-center group'
+                >
+                  <X
+                    size={18}
+                    className='text-white group-hover:rotate-90 transition-transform duration-200'
+                  />
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Thread History Sidebar */}
+          {showThreads && (
+            <div className='bg-gradient-to-b from-gray-50 to-white border-b border-gray-200 max-h-48 overflow-y-auto'>
+              <div className='p-4'>
+                <div className='flex items-center justify-between mb-3'>
+                  <h4 className='font-semibold text-gray-800 flex items-center gap-2'>
+                    <History size={16} />
+                    Chat History
+                  </h4>
+                  <button
+                    onClick={handleNewChat}
+                    className='flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm'
+                  >
+                    <Plus size={14} />
+                    New Chat
+                  </button>
+                </div>
+                {isLoadingThreads ? (
+                  <div className='flex items-center justify-center py-4'>
+                    <Loader2 size={20} className='animate-spin text-gray-500' />
+                  </div>
+                ) : threads.length > 0 ? (
+                  <div className='space-y-2'>
+                    {threads.map((thread) => (
+                      <button
+                        key={thread.thread_id || thread.id}
+                        onClick={() =>
+                          loadThread(thread.thread_id || thread.id)
+                        }
+                        className={`w-full text-left p-3 rounded-lg transition-all duration-200 ${
+                          currentThreadId === (thread.thread_id || thread.id)
+                            ? 'bg-blue-100 border-2 border-blue-300'
+                            : 'bg-white border border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className='font-medium text-sm text-gray-800 truncate'>
+                          {thread.thread_name ||
+                            thread.title ||
+                            'Untitled Chat'}
+                        </div>
+                        <div className='text-xs text-gray-500 mt-1'>
+                          {new Date(
+                            thread.created_at || Date.now()
+                          ).toLocaleString()}
+                        </div>
+                        <div className='text-xs text-blue-600 mt-1 capitalize'>
+                          {thread.diagram_type || 'architecture'}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className='text-gray-500 text-sm text-center py-4'>
+                    No previous chats found
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Mode Selector with Pills */}
           <div className='p-4 bg-gradient-to-r from-gray-50 to-blue-50/50 border-b border-gray-100/50'>
@@ -477,6 +915,8 @@ const FloatingChatButton = ({
                 placeholder={
                   awaitingClarification
                     ? '🤔 Your answer...'
+                    : currentThreadId
+                    ? '💬 Continue the conversation or ask for updates...'
                     : '✨ Describe your dream project...'
                 }
                 className='flex-1 border-2 border-gray-200/50 rounded-2xl px-4 py-3 text-sm bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all duration-200 placeholder:text-gray-500'
@@ -520,6 +960,35 @@ const FloatingChatButton = ({
                     )
                   )}
                 </div>
+              </div>
+            )}
+            {/* Thread Status Indicator */}
+            <div className='mt-2 flex items-center justify-between text-xs text-gray-500'>
+              <span className='flex items-center gap-1'>
+                {currentThreadId ? (
+                  <>
+                    💾 Thread: {String(currentThreadId).slice(0, 8)}... (v
+                    {currentVersion})
+                  </>
+                ) : (
+                  <>📝 New conversation</>
+                )}
+              </span>
+              {(isSaving || isCreatingThread) && (
+                <span className='flex items-center gap-1'>
+                  <Loader2 size={12} className='animate-spin' />
+                  {isCreatingThread ? 'Creating thread...' : 'Saving...'}
+                </span>
+              )}
+            </div>
+            {/* Conversation Help Text */}
+            {currentThreadId && !awaitingClarification && (
+              <div className='mt-2 text-xs text-blue-600 bg-blue-50 rounded-lg p-2'>
+                💡 You can now ask me to update, modify, or enhance your
+                diagram!
+                <br />
+                Try: "Add authentication", "Make it more scalable", "Add a cache
+                layer"
               </div>
             )}
           </div>
