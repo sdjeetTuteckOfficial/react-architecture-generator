@@ -39,14 +39,14 @@ export function ImagesDropdown({ isOpen, setIsOpen, handleDragStart }) {
   );
 
   return (
-    <div className='mb-2 flex-grow'>
+    <div className='flex-shrink-0'>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className='w-full flex items-center justify-between text-left bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors shadow-sm'
+        className='w-full flex items-center justify-between text-left bg-gray-100 hover:bg-gray-200 p-2 rounded-md transition-colors text-sm'
       >
-        <span className='text-base font-medium text-gray-700'>Images</span>
+        <span className='font-medium text-gray-700'>Images</span>
         <svg
-          className={`w-5 h-5 transition-transform text-gray-600 ${
+          className={`w-4 h-4 transition-transform text-gray-600 ${
             isOpen ? 'rotate-180' : ''
           }`}
           fill='none'
@@ -61,24 +61,24 @@ export function ImagesDropdown({ isOpen, setIsOpen, handleDragStart }) {
           />
         </svg>
       </button>
+
       {isOpen && (
-        <div className='mt-3 border border-gray-200 rounded-lg p-3 bg-gray-50 shadow-inner'>
+        <div className='mt-2 border border-gray-200 rounded-md p-2 bg-gray-50'>
           <input
             type='text'
-            placeholder='Search images...'
-            className='w-full px-3 py-2 border border-gray-300 rounded-md mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm'
+            placeholder='Search...'
+            className='w-full px-2 py-1 border border-gray-300 rounded text-xs mb-2 focus:outline-none focus:ring-1 focus:ring-blue-500'
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+
           {loading ? (
-            <div className='flex items-center justify-center py-6'>
-              <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500'></div>
-              <span className='ml-3 text-sm text-gray-600'>
-                Loading images...
-              </span>
+            <div className='flex items-center justify-center py-4'>
+              <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500'></div>
+              <span className='ml-2 text-xs text-gray-600'>Loading...</span>
             </div>
           ) : (
-            <div className='grid grid-cols-3 gap-3 h-64 overflow-y-auto pr-2 custom-scrollbar'>
+            <div className='grid grid-cols-4 gap-1 h-40 overflow-y-auto custom-scrollbar'>
               {filteredImages.length > 0 ? (
                 filteredImages.map((imageName, index) => (
                   <div
@@ -94,50 +94,27 @@ export function ImagesDropdown({ isOpen, setIsOpen, handleDragStart }) {
                     }
                     draggable
                   >
-                    <div className='aspect-square bg-white rounded-lg border border-gray-300 p-1 flex flex-col items-center justify-center relative overflow-hidden shadow-sm hover:shadow-md transition-shadow group-hover:border-blue-400 group-hover:shadow-lg'>
+                    <div className='aspect-square bg-white rounded border border-gray-300 p-0.5 flex items-center justify-center relative overflow-hidden hover:border-blue-400 transition-colors'>
                       <img
                         src={`/images/${imageName}`}
                         alt={getImageName(imageName)}
                         className='w-full h-full object-contain rounded'
                         onError={handleImageError}
                       />
-                      <div className='absolute inset-0 flex w-full h-full items-center justify-center bg-gray-100 rounded-lg opacity-0 group-hover:opacity-50 transition-opacity'>
-                        <svg
-                          className='w-6 h-6 text-gray-400'
-                          fill='none'
-                          stroke='currentColor'
-                          viewBox='0 0 24 24'
-                        >
-                          <path
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                            strokeWidth={2}
-                            d='M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2z'
-                          />
-                        </svg>
-                      </div>
                     </div>
-                    <div className='mt-1'>
-                      <span className='text-xs text-gray-600 truncate block group-hover:text-blue-700'>
-                        {getImageName(imageName)}
-                      </span>
-                    </div>
+                    <span
+                      className='text-xs text-gray-600 truncate block mt-0.5'
+                      title={getImageName(imageName)}
+                    >
+                      {getImageName(imageName)}
+                    </span>
                   </div>
                 ))
               ) : (
-                <div className='col-span-3 text-center py-4'>
-                  <div className='text-gray-400 text-2xl mb-2'>🔍</div>
-                  <p className='text-gray-500 text-sm'>
-                    No images match your search.
-                  </p>
+                <div className='col-span-4 text-center py-4'>
+                  <p className='text-gray-500 text-xs'>No images found.</p>
                 </div>
               )}
-            </div>
-          )}
-          {!loading && images.length === 0 && filteredImages.length === 0 && (
-            <div className='text-center py-4'>
-              <div className='text-gray-400 text-2xl mb-2'>📁</div>
-              <p className='text-gray-500 text-sm'>No images found.</p>
             </div>
           )}
         </div>
@@ -153,18 +130,16 @@ export function DiagramTypeDropdown({
   handleSelectDiagramType,
 }) {
   return (
-    <div className='mb-4 relative'>
+    <div className='relative flex-shrink-0'>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className='w-full flex items-center justify-between text-left bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors shadow-sm'
+        className='w-full flex items-center justify-between text-left bg-gray-100 hover:bg-gray-200 p-2 rounded-md transition-colors text-sm'
       >
-        <span className='text-base font-medium text-gray-700'>
-          {diagramType === 'architecture'
-            ? 'Architecture Diagram'
-            : 'DB Diagram'}
+        <span className='font-medium text-gray-700'>
+          {diagramType === 'architecture' ? 'Architecture' : 'Database'}
         </span>
         <svg
-          className={`w-5 h-5 transition-transform text-gray-600 ${
+          className={`w-4 h-4 transition-transform text-gray-600 ${
             isOpen ? 'rotate-180' : ''
           }`}
           fill='none'
@@ -179,27 +154,28 @@ export function DiagramTypeDropdown({
           />
         </svg>
       </button>
+
       {isOpen && (
-        <div className='absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1'>
+        <div className='absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1'>
           <button
             onClick={() => handleSelectDiagramType('architecture')}
-            className={`block w-full text-left px-4 py-2 text-sm ${
+            className={`block w-full text-left px-3 py-2 text-sm transition-colors ${
               diagramType === 'architecture'
-                ? 'bg-blue-100 text-blue-700 font-semibold'
+                ? 'bg-blue-100 text-blue-700 font-medium'
                 : 'text-gray-700 hover:bg-gray-50'
-            } rounded-t-lg`}
+            } rounded-t-md`}
           >
-            Architecture Diagram
+            Architecture
           </button>
           <button
             onClick={() => handleSelectDiagramType('db_diagram')}
-            className={`block w-full text-left px-4 py-2 text-sm ${
+            className={`block w-full text-left px-3 py-2 text-sm transition-colors ${
               diagramType === 'db_diagram'
-                ? 'bg-blue-100 text-blue-700 font-semibold'
+                ? 'bg-blue-100 text-blue-700 font-medium'
                 : 'text-gray-700 hover:bg-gray-50'
-            } rounded-b-lg`}
+            } rounded-b-md`}
           >
-            DB Diagram
+            Database
           </button>
         </div>
       )}
@@ -262,30 +238,30 @@ export function DatabaseDropdown({
   const isExportDisabled = isExporting || nodes.length === 0;
   const exportButtonTitle =
     nodes.length === 0
-      ? 'Create a database diagram first to enable export'
+      ? 'Create a database diagram first'
       : 'Export your database schema';
 
   return (
-    <div className='mb-2 flex-grow'>
+    <div className='flex-shrink-0'>
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={isExportDisabled}
         title={exportButtonTitle}
-        className={`w-full flex items-center justify-between text-left bg-gray-100 p-3 rounded-lg transition-colors shadow-sm
+        className={`w-full flex items-center justify-between text-left bg-gray-100 p-2 rounded-md transition-colors text-sm
           ${
             isExportDisabled
               ? 'opacity-50 cursor-not-allowed'
               : 'hover:bg-gray-200'
           }`}
       >
-        <span className='text-base font-medium text-gray-700'>
-          {isExporting ? 'Generating SQL...' : 'Export Database Schema'}
+        <span className='font-medium text-gray-700'>
+          {isExporting ? 'Generating...' : 'Export SQL'}
         </span>
         {isExporting ? (
-          <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white'></div>
+          <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500'></div>
         ) : (
           <svg
-            className={`w-5 h-5 transition-transform text-gray-600 ${
+            className={`w-4 h-4 transition-transform text-gray-600 ${
               isOpen ? 'rotate-180' : ''
             }`}
             fill='none'
@@ -301,49 +277,37 @@ export function DatabaseDropdown({
           </svg>
         )}
       </button>
+
       {isOpen && !isExporting && (
-        <div className='mt-3 border border-gray-200 rounded-lg p-3 bg-gray-50 shadow-inner animate-fade-in'>
-          <div className='text-sm font-semibold text-gray-800 mb-2'>
-            Select Database Type:
+        <div className='mt-2 border border-gray-200 rounded-md p-2 bg-gray-50'>
+          <div className='text-xs font-medium text-gray-800 mb-2'>
+            Select Database:
           </div>
-          <div className='grid grid-cols-3 gap-2 h-28 overflow-y-auto custom-scrollbar p-1'>
+          <div className='grid grid-cols-5 gap-1'>
             {DATABASE_OPTIONS.map((db) => (
               <button
                 key={db.id}
                 onClick={() => handleDatabaseExport(db.id)}
                 disabled={nodes.length === 0}
-                className={`flex flex-col items-center justify-center p-2 bg-white rounded-lg border border-gray-200 shadow-sm aspect-square
+                className={`flex flex-col items-center justify-center p-2 bg-white rounded border border-gray-200 aspect-square text-xs
                   ${
                     nodes.length === 0
                       ? 'opacity-50 cursor-not-allowed'
-                      : 'hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 ease-in-out group transform hover:scale-105'
+                      : 'hover:border-blue-400 hover:bg-blue-50 transition-all transform hover:scale-105'
                   }`}
                 title={nodes.length === 0 ? 'Create a diagram first' : db.name}
               >
-                <span className='text-2xl'>{db.icon}</span>
+                <span className='text-lg mb-1'>{db.icon}</span>
+                <span className='text-xs text-center leading-tight'>
+                  {db.name.split(' ')[0]}
+                </span>
               </button>
             ))}
           </div>
+
           {nodes.length === 0 && (
-            <div className='mt-3 p-3 bg-yellow-50 border border-yellow-300 rounded-lg animate-fade-in'>
-              <div className='flex items-center'>
-                <svg
-                  className='w-5 h-5 text-yellow-600 mr-2 flex-shrink-0'
-                  fill='none'
-                  stroke='currentColor'
-                  viewBox='0 0 24 24'
-                >
-                  <path
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth={2}
-                    d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z'
-                  />
-                </svg>
-                <span className='text-sm text-yellow-700'>
-                  Create a database diagram first to export SQL schema.
-                </span>
-              </div>
+            <div className='mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700'>
+              ⚠️ Create a database diagram first to export SQL schema.
             </div>
           )}
         </div>

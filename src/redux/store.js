@@ -2,12 +2,14 @@
 import { configureStore } from '@reduxjs/toolkit';
 import diagramReducer from './diagramSlice';
 import chatReducer from './webChatSlice';
+import threadReducer from './threadSlice';
 
 export const store = configureStore({
   reducer: {
     // This is where you combine all your reducers (slices)
     diagram: diagramReducer,
     chat: chatReducer,
+    thread: threadReducer,
     // Add other reducers here if your app grows, e.g.,
     // auth: authReducer,
     // user: userReducer,

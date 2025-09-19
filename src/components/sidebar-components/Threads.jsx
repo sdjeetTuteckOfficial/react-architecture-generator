@@ -1,16 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
+import {
+  ChevronRight,
+  ChevronDown,
+  Clock,
+  Layers,
+  AlertCircle,
+  Loader2,
+  Plus,
+} from 'lucide-react';
+import { useDispatch } from 'react-redux';
+import {
+  setCurrentThread,
+  setConversationHistory,
+} from '../../redux/threadSlice';
 
-export default function Threads({ showCustomMessageBox }) {
+export default function Threads({ showCustomMessageBox, onLoadConversation }) {
   const [threads, setThreads] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [expandedThread, setExpandedThread] = useState(null);
+  const [threadConversations, setThreadConversations] = useState({});
+  const [loadingThreads, setLoadingThreads] = useState(false);
+  const [loadingConversations, setLoadingConversations] = useState({});
   const [error, setError] = useState(null);
   const [skip, setSkip] = useState(0);
-  const [limit, setLimit] = useState(10); // Adjusted for vertical scroll
-  const [hasMore, setHasMore] = useState(true); // Track if more threads are available
+  const [limit, setLimit] = useState(10);
+  const [hasMore, setHasMore] = useState(true);
   const scrollContainerRef = useRef(null);
+  const dispatch = useDispatch();
 
   const fetchThreads = async (newSkip) => {
-    setLoading(true);
+    setLoadingThreads(true);
     setError(null);
     try {
       const response = await fetch(
@@ -29,8 +47,8 @@ export default function Threads({ showCustomMessageBox }) {
       }
 
       const data = await response.json();
-      setThreads((prev) => [...prev, ...data]); // Append new threads
-      setHasMore(data.length === limit); // If fewer threads than limit, no more to fetch
+      setThreads((prev) => [...prev, ...data]);
+      setHasMore(data.length === limit);
     } catch (err) {
       console.error('Error fetching threads:', err);
       setError('Failed to fetch threads. Please try again.');
@@ -40,7 +58,52 @@ export default function Threads({ showCustomMessageBox }) {
         'error'
       );
     } finally {
-      setLoading(false);
+      setLoadingThreads(false);
+    }
+  };
+
+  const fetchConversations = async (threadId) => {
+    setLoadingConversations((prev) => ({ ...prev, [threadId]: true }));
+    try {
+      const response = await fetch(
+        `http://localhost:8000/architecture/threads/${threadId}/conversations`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const conversations = await response.json();
+      const sortedConversations = conversations.sort(
+        (a, b) => a.version - b.version
+      );
+
+      setThreadConversations((prev) => ({
+        ...prev,
+        [threadId]: sortedConversations,
+      }));
+
+      dispatch(
+        setConversationHistory({
+          threadId,
+          conversations: sortedConversations,
+        })
+      );
+    } catch (err) {
+      console.error('Error fetching conversations:', err);
+      showCustomMessageBox(
+        'Load Error',
+        'Failed to load conversation history.',
+        'error'
+      );
+    } finally {
+      setLoadingConversations((prev) => ({ ...prev, [threadId]: false }));
     }
   };
 
@@ -50,14 +113,13 @@ export default function Threads({ showCustomMessageBox }) {
 
   const handleScroll = () => {
     const container = scrollContainerRef.current;
-    if (!container || loading || !hasMore) return;
+    if (!container || loadingThreads || !hasMore) return;
 
-    // Check if scrolled to the bottom end
     if (
       container.scrollTop + container.clientHeight >=
       container.scrollHeight - 10
     ) {
-      setSkip((prev) => prev + limit); // Increment skip for next page
+      setSkip((prev) => prev + limit);
     }
   };
 
@@ -67,48 +129,244 @@ export default function Threads({ showCustomMessageBox }) {
       container.addEventListener('scroll', handleScroll);
       return () => container.removeEventListener('scroll', handleScroll);
     }
-  }, [loading, hasMore]);
+  }, [loadingThreads, hasMore]);
+
+  const handleThreadExpand = async (threadId) => {
+    if (expandedThread === threadId) {
+      setExpandedThread(null);
+    } else {
+      setExpandedThread(threadId);
+      if (!threadConversations[threadId]) {
+        await fetchConversations(threadId);
+      }
+    }
+  };
+
+  const handleLoadVersion = (thread, conversation) => {
+    dispatch(
+      setCurrentThread({
+        threadId: thread.thread_id,
+        threadName: thread.thread_name,
+        currentVersion: conversation.version,
+      })
+    );
+
+    if (onLoadConversation) {
+      onLoadConversation(thread.thread_id, conversation);
+    }
+
+    showCustomMessageBox(
+      'Version Loaded',
+      `Loaded version ${conversation.version} from ${new Date(
+        conversation.created_at
+      ).toLocaleDateString()}`,
+      'success'
+    );
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
+  };
 
   return (
-    <div className='mb-4'>
-      <div className='text-base font-medium text-gray-700 mb-2'>Threads</div>
-      {loading && threads.length === 0 ? (
-        <div className='flex items-center justify-center py-4'>
-          <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500'></div>
-          <span className='ml-3 text-sm text-gray-600'>Loading threads...</span>
-        </div>
-      ) : error ? (
-        <div className='text-center py-4'>
-          <p className='text-red-500 text-sm'>{error}</p>
-        </div>
-      ) : threads.length === 0 ? (
-        <div className='text-center py-4'>
-          <div className='text-gray-400 text-2xl mb-2'>📜</div>
-          <p className='text-gray-500 text-sm'>No threads found.</p>
-        </div>
-      ) : (
-        <div
-          ref={scrollContainerRef}
-          className='border border-gray-200 rounded-lg p-3 bg-gray-50 shadow-inner overflow-y-auto custom-scrollbar h-32' // Vertical scroll, fixed height
+    <div className='flex flex-col h-full min-h-0'>
+      {/* Header */}
+      <div className='flex items-center justify-between mb-2 flex-shrink-0'>
+        <h3 className='text-sm font-medium text-gray-700'>Conversations</h3>
+        <button
+          className='p-1 hover:bg-gray-100 rounded transition-colors'
+          title='Create new thread'
         >
-          {threads.map((thread) => (
-            <div
-              key={thread.thread_id}
-              className='p-2 mb-2 text-sm text-gray-700 truncate'
-            >
-              {thread.thread_name}
-            </div>
-          ))}
-          {loading && (
-            <div className='flex items-center justify-center py-2'>
-              <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500'></div>
-              <span className='ml-3 text-sm text-gray-600'>
-                Loading more...
-              </span>
-            </div>
-          )}
-        </div>
-      )}
+          <Plus size={14} className='text-gray-500' />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className='flex-1 min-h-0'>
+        {loadingThreads && threads.length === 0 ? (
+          <div className='flex items-center justify-center py-4'>
+            <Loader2 size={16} className='animate-spin text-blue-500' />
+            <span className='ml-2 text-xs text-gray-600'>Loading...</span>
+          </div>
+        ) : error ? (
+          <div className='text-center py-4'>
+            <AlertCircle size={16} className='text-red-500 mx-auto mb-1' />
+            <p className='text-red-500 text-xs'>{error}</p>
+          </div>
+        ) : threads.length === 0 ? (
+          <div className='text-center py-6'>
+            <div className='text-gray-400 text-lg mb-1'>📜</div>
+            <p className='text-gray-500 text-xs'>No conversations yet.</p>
+          </div>
+        ) : (
+          <div
+            ref={scrollContainerRef}
+            className='h-full border border-gray-200 rounded-md bg-gray-50 overflow-y-auto custom-scrollbar'
+          >
+            {threads.map((thread) => (
+              <div
+                key={thread.thread_id}
+                className='border-b border-gray-100 last:border-b-0'
+              >
+                {/* Thread Header - Compact */}
+                <button
+                  onClick={() => handleThreadExpand(thread.thread_id)}
+                  className='w-full p-2 hover:bg-gray-100 transition-colors flex items-center text-left'
+                >
+                  <div className='flex items-center gap-1 flex-1 min-w-0'>
+                    {expandedThread === thread.thread_id ? (
+                      <ChevronDown
+                        size={12}
+                        className='text-gray-500 flex-shrink-0'
+                      />
+                    ) : (
+                      <ChevronRight
+                        size={12}
+                        className='text-gray-500 flex-shrink-0'
+                      />
+                    )}
+                    <div className='flex-1 min-w-0'>
+                      <div className='text-xs font-medium text-gray-700 truncate'>
+                        {thread.thread_name}
+                      </div>
+                      <div className='text-xs text-gray-500'>
+                        {formatDate(thread.created_at)}
+                      </div>
+                    </div>
+                  </div>
+                  {threadConversations[thread.thread_id] && (
+                    <span className='text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full flex-shrink-0'>
+                      {threadConversations[thread.thread_id].length}
+                    </span>
+                  )}
+                </button>
+
+                {/* Conversation Timeline - Compact */}
+                {expandedThread === thread.thread_id && (
+                  <div className='bg-white border-t border-gray-100'>
+                    {loadingConversations[thread.thread_id] ? (
+                      <div className='flex items-center justify-center py-2'>
+                        <Loader2
+                          size={12}
+                          className='animate-spin text-gray-400'
+                        />
+                        <span className='ml-1 text-xs text-gray-500'>
+                          Loading...
+                        </span>
+                      </div>
+                    ) : threadConversations[thread.thread_id] ? (
+                      <div className='py-1'>
+                        {threadConversations[thread.thread_id].map(
+                          (conversation, index) => (
+                            <button
+                              key={conversation.conversation_id}
+                              onClick={() =>
+                                handleLoadVersion(thread, conversation)
+                              }
+                              className='w-full px-2 py-1.5 hover:bg-blue-50 transition-colors flex items-center gap-2 group'
+                            >
+                              {/* Timeline indicator - Smaller */}
+                              <div className='flex flex-col items-center'>
+                                <div
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    index ===
+                                    threadConversations[thread.thread_id]
+                                      .length -
+                                      1
+                                      ? 'bg-blue-500'
+                                      : 'bg-gray-300'
+                                  }`}
+                                />
+                                {index <
+                                  threadConversations[thread.thread_id].length -
+                                    1 && (
+                                  <div className='w-px h-4 bg-gray-200 mt-0.5' />
+                                )}
+                              </div>
+
+                              {/* Version info - Compact */}
+                              <div className='flex-1 text-left'>
+                                <div className='flex items-center gap-1'>
+                                  <Layers size={10} className='text-gray-400' />
+                                  <span className='text-xs font-medium text-gray-700'>
+                                    v{conversation.version}
+                                  </span>
+                                  {index ===
+                                    threadConversations[thread.thread_id]
+                                      .length -
+                                      1 && (
+                                    <span className='text-xs bg-green-100 text-green-700 px-1 py-0.5 rounded'>
+                                      Latest
+                                    </span>
+                                  )}
+                                </div>
+                                <div className='flex items-center gap-1 mt-0.5'>
+                                  <Clock size={8} className='text-gray-400' />
+                                  <span className='text-xs text-gray-500'>
+                                    {new Date(
+                                      conversation.created_at
+                                    ).toLocaleString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </span>
+                                </div>
+                                {conversation.diagram_json?.metadata && (
+                                  <div className='text-xs text-gray-400 mt-0.5'>
+                                    {
+                                      conversation.diagram_json.metadata
+                                        .node_count
+                                    }{' '}
+                                    nodes
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* View indicator */}
+                              <div className='opacity-0 group-hover:opacity-100 transition-opacity'>
+                                <ChevronRight
+                                  size={12}
+                                  className='text-blue-500'
+                                />
+                              </div>
+                            </button>
+                          )
+                        )}
+                      </div>
+                    ) : (
+                      <div className='py-2 text-center text-xs text-gray-500'>
+                        No versions available
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {loadingThreads && threads.length > 0 && (
+              <div className='flex items-center justify-center py-2'>
+                <Loader2 size={14} className='animate-spin text-blue-500' />
+                <span className='ml-1 text-xs text-gray-600'>
+                  Loading more...
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
