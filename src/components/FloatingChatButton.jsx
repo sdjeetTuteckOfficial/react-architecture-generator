@@ -21,6 +21,7 @@ const FloatingChatButton = ({
   handleGenerateDiagram,
   userId = '3fa85f64-5717-4562-b3fc-2c963f66afa6',
 }) => {
+  const token = localStorage.getItem('authToken');
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
@@ -69,10 +70,10 @@ const FloatingChatButton = ({
 
   // Load threads when chat opens
   useEffect(() => {
-    if (isOpen && userId) {
+    if (isOpen && token) {
       loadThreads();
     }
-  }, [isOpen, userId]);
+  }, [isOpen, token]);
 
   const addMessage = (type, content, isError = false) => {
     const newMessage = {
@@ -86,49 +87,24 @@ const FloatingChatButton = ({
     return newMessage;
   };
 
-  // Utility function to generate or validate UUID
-  const generateUUID = () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
-      /[xy]/g,
-      function (c) {
-        const r = (Math.random() * 16) | 0;
-        const v = c == 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-      }
-    );
-  };
-
-  const validateAndFormatUserId = (id) => {
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (uuidRegex.test(id)) {
-      return id;
-    }
-
-    const storedUUID = localStorage.getItem(`user_uuid_${id}`);
-    if (storedUUID && uuidRegex.test(storedUUID)) {
-      return storedUUID;
-    }
-
-    const newUUID = generateUUID();
-    localStorage.setItem(`user_uuid_${id}`, newUUID);
-    return newUUID;
-  };
-
-  const getFormattedUserId = () => {
-    if (!userId) return null;
-    return validateAndFormatUserId(userId);
-  };
-
   // API Functions for Thread Management
   const loadThreads = async () => {
-    const formattedUserId = getFormattedUserId();
-    if (!formattedUserId) return;
+    if (!token) {
+      console.warn('No auth token available');
+      return;
+    }
 
     setIsLoadingThreads(true);
     try {
+      // FIXED: Remove user_id parameter - backend gets it from token
       const response = await fetch(
-        `${apiBaseUrl}/threads?user_id=${formattedUserId}&skip=0&limit=100`
+        `${apiBaseUrl}/architecture/threads?skip=0&limit=100`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
       );
       if (response.ok) {
         const threadsData = await response.json();
@@ -150,20 +126,20 @@ const FloatingChatButton = ({
   };
 
   const createThread = async () => {
-    const formattedUserId = getFormattedUserId();
-    if (!formattedUserId || isCreatingThread) return null;
+    if (!token || isCreatingThread) return null;
 
     setIsCreatingThread(true);
     console.log('Creating thread...');
 
     try {
-      const response = await fetch(`${apiBaseUrl}/threads`, {
+      const response = await fetch(`${apiBaseUrl}/architecture/threads`, {
         method: 'POST',
         headers: {
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        // FIXED: Remove user_id from body - backend sets it from token
         body: JSON.stringify({
-          user_id: formattedUserId,
           thread_name: `${
             diagramType === 'architecture' ? 'Architecture' : 'Database'
           } Chat - ${new Date().toLocaleString()}`,
@@ -200,11 +176,10 @@ const FloatingChatButton = ({
   };
 
   const saveConversation = async (threadId, diagramData = null) => {
-    const formattedUserId = getFormattedUserId();
-    if (!threadId || !formattedUserId) {
-      console.warn('Cannot save conversation: missing threadId or userId', {
+    if (!threadId || !token) {
+      console.warn('Cannot save conversation: missing threadId or token', {
         threadId,
-        formattedUserId,
+        hasToken: !!token,
       });
       return;
     }
@@ -230,10 +205,11 @@ const FloatingChatButton = ({
       };
 
       const response = await fetch(
-        `${apiBaseUrl}/threads/${threadId}/conversations`,
+        `${apiBaseUrl}/architecture/threads/${threadId}/conversations`,
         {
           method: 'POST',
           headers: {
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(conversationData),
@@ -273,7 +249,13 @@ const FloatingChatButton = ({
   const loadThread = async (threadId) => {
     try {
       const response = await fetch(
-        `${apiBaseUrl}/threads/${threadId}/conversations`
+        `${apiBaseUrl}/architecture/threads/${threadId}/conversations`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
       );
       if (response.ok) {
         const conversations = await response.json();
@@ -342,9 +324,10 @@ const FloatingChatButton = ({
 
   const analyzeProject = async (description) => {
     try {
-      const response = await fetch(`${apiBaseUrl}/analyze`, {
+      const response = await fetch(`${apiBaseUrl}/architecture/analyze`, {
         method: 'POST',
         headers: {
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ description }),
@@ -368,18 +351,22 @@ const FloatingChatButton = ({
     type = 'architecture'
   ) => {
     try {
-      const response = await fetch(`${apiBaseUrl}/generate-diagram`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          description,
-          context: context || {},
-          clarification_responses: responses || {},
-          diagram_type: type,
-        }),
-      });
+      const response = await fetch(
+        `${apiBaseUrl}/architecture/generate-diagram`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            description,
+            context: context || {},
+            clarification_responses: responses || {},
+            diagram_type: type,
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -402,8 +389,8 @@ const FloatingChatButton = ({
       return currentThreadId;
     }
 
-    if (!userId) {
-      console.warn('No userId provided, cannot create thread');
+    if (!token) {
+      console.warn('No auth token provided, cannot create thread');
       return null;
     }
 
@@ -696,7 +683,7 @@ const FloatingChatButton = ({
                   />
                 </button>
                 {/* Save Button */}
-                {userId && (
+                {token && (
                   <button
                     onClick={handleSaveCurrentChat}
                     disabled={isSaving || isCreatingThread}

@@ -35,8 +35,9 @@ const Login = () => {
       });
 
       if (response.data?.access_token) {
+        console.log('token', response.data.access_token);
         localStorage.setItem('authToken', response.data.access_token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        // localStorage.setItem('user', JSON.stringify(response.data.user));
         navigate('/dashboard');
       } else {
         setError(response.data?.message || 'Invalid login response');
