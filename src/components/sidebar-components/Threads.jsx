@@ -132,7 +132,10 @@ export default function Threads({
       }
 
       const data = await response.json();
-      setThreads((prev) => [...prev, ...data]);
+      setThreads((prev) => {
+        return newSkip === 0 ? data : [...prev, ...data];
+      });
+      // setThreads((prev) => [...prev, ...data]);
       setHasMore(data.length === limit);
     } catch (err) {
       console.error('Error fetching threads:', err);
