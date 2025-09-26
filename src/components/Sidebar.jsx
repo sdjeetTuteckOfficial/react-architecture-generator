@@ -1,4 +1,3 @@
-// Sidebar.jsx - Optimized slim version
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
@@ -13,7 +12,27 @@ import Threads from './sidebar-components/Threads';
 import { handleDragStart, handleLogout } from './sidebar-components/utils';
 import gunevoLogo from '/public/images/gunevo.svg';
 
-export default function Sidebar({ nodes, edges, onLoadConversation }) {
+export default function Sidebar({
+  // Destructure all flow state props
+  nodes,
+  setNodes,
+  onNodesChange,
+  edges,
+  setEdges,
+  onEdgesChange,
+  selectedNode,
+  setSelectedNode,
+  selectedNodes,
+  setSelectedNodes,
+  selectedEdges,
+  setSelectedEdges,
+  isModalOpen,
+  setIsModalOpen,
+  loading,
+  setLoading,
+  onLoadConversation,
+  flowState, // Keep this for backward compatibility if needed
+}) {
   const [isImagesDropdownOpen, setIsImagesDropdownOpen] = useState(false);
   const [isDiagramTypeDropdownOpen, setIsDiagramTypeDropdownOpen] =
     useState(false);
@@ -59,10 +78,27 @@ export default function Sidebar({ nodes, edges, onLoadConversation }) {
           <Threads
             showCustomMessageBox={showCustomMessageBox}
             onLoadConversation={handleLoadConversation}
+            // Pass all flow state props to Threads
+            nodes={nodes}
+            setNodes={setNodes}
+            onNodesChange={onNodesChange}
+            edges={edges}
+            setEdges={setEdges}
+            onEdgesChange={onEdgesChange}
+            selectedNode={selectedNode}
+            setSelectedNode={setSelectedNode}
+            selectedNodes={selectedNodes}
+            setSelectedNodes={setSelectedNodes}
+            selectedEdges={selectedEdges}
+            setSelectedEdges={setSelectedEdges}
+            isModalOpen={isModalOpen}
+            setIsModalOpen={setIsModalOpen}
+            loading={loading}
+            setLoading={setLoading}
           />
         </div>
 
-        {/* Diagram Type Dropdown - Compact */}
+        {/* Rest of your component remains the same */}
         <div className='flex-shrink-0'>
           <DiagramTypeDropdown
             isOpen={isDiagramTypeDropdownOpen}
@@ -75,7 +111,6 @@ export default function Sidebar({ nodes, edges, onLoadConversation }) {
           />
         </div>
 
-        {/* Conditional dropdowns - Compact */}
         {diagramType === 'architecture' && (
           <div className='flex-shrink-0'>
             <ImagesDropdown
@@ -136,7 +171,7 @@ export default function Sidebar({ nodes, edges, onLoadConversation }) {
                 strokeLinecap='round'
                 strokeLinejoin='round'
                 strokeWidth={2}
-                d='M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H5a3 3 0 01-3-3V7a3 3 0 013-3h5a3 3 0 013 3v1'
+                d='M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H5a3 3 0 01-3-3V7a3 3 0 013 3v1'
               />
             </svg>
           </button>

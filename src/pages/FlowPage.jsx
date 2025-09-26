@@ -1,19 +1,24 @@
 import React from 'react';
 import Sidebar from '../components/Sidebar';
-import AppFlowCanvasWrapper from '../components/AppFlowCanvasWrapper'; // Corrected import path
-import { useFlowState } from '../hooks/useFlowStates'; // Import the custom hook
+import AppFlowCanvasWrapper from '../components/AppFlowCanvasWrapper';
+import { useFlowState } from '../hooks/useFlowStates';
+import { ReactFlowProvider } from 'reactflow';
 
 export default function FlowPage() {
-  // Call useFlowState here to manage the flow's state
+  // Single source of truth for flow state
   const flowState = useFlowState();
 
   return (
-    <div className='h-screen flex'>
-      <Sidebar nodes={flowState.nodes} edges={flowState.edges} />
-      <div className='flex-1 flex flex-col relative'>
-        {/* Pass all properties from flowState as props to AppFlowCanvasWrapper */}
-        <AppFlowCanvasWrapper {...flowState} />
+    <ReactFlowProvider>
+      <div className='h-screen flex'>
+        <Sidebar
+          // Pass the state setters to Sidebar
+          {...flowState}
+        />
+        <div className='flex-1 flex flex-col relative'>
+          <AppFlowCanvasWrapper {...flowState} />
+        </div>
       </div>
-    </div>
+    </ReactFlowProvider>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ChevronRight,
   ChevronDown,
@@ -8,13 +8,36 @@ import {
   Loader2,
   Plus,
 } from 'lucide-react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   setCurrentThread,
   setConversationHistory,
 } from '../../redux/threadSlice';
+import { processImagePath } from '../../hooks/useFlowStates'; // Import the utility function
+import DbTableEditor from '../DbTableEditor';
+import EditModal from '../EditModal';
 
-export default function Threads({ showCustomMessageBox, onLoadConversation }) {
+export default function Threads({
+  showCustomMessageBox,
+  onLoadConversation,
+  // Props from parent FlowCanvas
+  nodes,
+  setNodes,
+  onNodesChange,
+  edges,
+  setEdges,
+  onEdgesChange,
+  selectedNode,
+  setSelectedNode,
+  selectedNodes,
+  setSelectedNodes,
+  selectedEdges,
+  setSelectedEdges,
+  isModalOpen,
+  setIsModalOpen,
+  loading,
+  setLoading,
+}) {
   const [threads, setThreads] = useState([]);
   const [expandedThread, setExpandedThread] = useState(null);
   const [threadConversations, setThreadConversations] = useState({});
@@ -26,6 +49,68 @@ export default function Threads({ showCustomMessageBox, onLoadConversation }) {
   const [hasMore, setHasMore] = useState(true);
   const scrollContainerRef = useRef(null);
   const dispatch = useDispatch();
+
+  // Get diagramType from Redux store
+  const diagramType = useSelector((state) => state.diagram.diagramType);
+
+  // Create handleEditNode function similar to FlowCanvas
+  const handleEditNode = useCallback(
+    (nodeId) => {
+      setNodes((currentNodes) => {
+        const nodeToEdit = currentNodes.find((n) => n.id === nodeId);
+        if (nodeToEdit) {
+          setSelectedNode(nodeToEdit);
+          setIsModalOpen(true);
+        }
+        return currentNodes;
+      });
+    },
+    [setNodes, setSelectedNode, setIsModalOpen]
+  );
+
+  // Handle node updates from modal
+  const handleUpdateNode = useCallback(
+    (updatedNode) => {
+      setNodes((prevNodes) =>
+        prevNodes.map((n) =>
+          n.id === updatedNode.id
+            ? {
+                ...n,
+                data: {
+                  ...updatedNode.data,
+                  onEdit: handleEditNode,
+                },
+              }
+            : n
+        )
+      );
+      setSelectedNode(null);
+      setIsModalOpen(false);
+    },
+    [setNodes, handleEditNode, setSelectedNode, setIsModalOpen]
+  );
+
+  // Handle node deletion from modal
+  const handleDeleteNode = useCallback(
+    (id) => {
+      setNodes((prev) => prev.filter((n) => !n.selected));
+      setEdges((prev) =>
+        prev.filter((e) => !e.selected && e.source !== id && e.target !== id)
+      );
+      setSelectedNode(null);
+      setSelectedNodes([]);
+      setSelectedEdges([]);
+      setIsModalOpen(false);
+    },
+    [
+      setNodes,
+      setEdges,
+      setSelectedNode,
+      setSelectedNodes,
+      setSelectedEdges,
+      setIsModalOpen,
+    ]
+  );
 
   const fetchThreads = async (newSkip) => {
     setLoadingThreads(true);
@@ -47,7 +132,10 @@ export default function Threads({ showCustomMessageBox, onLoadConversation }) {
       }
 
       const data = await response.json();
-      setThreads((prev) => [...prev, ...data]);
+      setThreads((prev) => {
+        return newSkip === 0 ? data : [...prev, ...data];
+      });
+      // setThreads((prev) => [...prev, ...data]);
       setHasMore(data.length === limit);
     } catch (err) {
       console.error('Error fetching threads:', err);
@@ -142,27 +230,81 @@ export default function Threads({ showCustomMessageBox, onLoadConversation }) {
     }
   };
 
-  const handleLoadVersion = (thread, conversation) => {
-    dispatch(
-      setCurrentThread({
-        threadId: thread.thread_id,
-        threadName: thread.thread_name,
-        currentVersion: conversation.version,
-      })
-    );
+  const handleLoadVersion = useCallback(
+    (thread, conversation) => {
+      // Process nodes and edges similar to handleDiagramUpdate in FlowCanvas
+      if (conversation.diagram_json && conversation.diagram_json.nodes) {
+        const processedNodes = conversation.diagram_json.nodes.map((node) => {
+          let nodeType = 'custom';
+          let nodeData = {
+            ...node.data,
+            onEdit: handleEditNode, // Attach the handleEditNode function
+          };
 
-    if (onLoadConversation) {
-      onLoadConversation(thread.thread_id, conversation);
-    }
+          console.log('diagramType', diagramType);
 
-    showCustomMessageBox(
-      'Version Loaded',
-      `Loaded version ${conversation.version} from ${new Date(
-        conversation.created_at
-      ).toLocaleDateString()}`,
-      'success'
-    );
-  };
+          if (diagramType === 'architecture') {
+            nodeType = node.data.image ? 'custom' : 'default';
+            nodeData.image = processImagePath(node.data.image);
+          } else if (diagramType === 'db_diagram') {
+            console.log('Creating DB node:', nodeType, node.data);
+            nodeType = 'dbTableNode';
+          }
+
+          return {
+            ...node,
+            type: nodeType,
+            position: node.position || { x: 100, y: 100 },
+            data: nodeData,
+            zIndex: node.zIndex || 1,
+          };
+        });
+
+        setNodes(processedNodes);
+      }
+
+      if (conversation.diagram_json && conversation.diagram_json.edges) {
+        const nodeIds = new Set(
+          conversation.diagram_json.nodes?.map((n) => n.id) || []
+        );
+        const processedEdges = conversation.diagram_json.edges
+          .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
+          .map((e, i) => ({ id: e.id || `edge-${i}`, ...e }));
+
+        setEdges(processedEdges);
+      }
+
+      // Clear any selections when loading a new version
+      setSelectedNode(null);
+      setSelectedNodes([]);
+      setSelectedEdges([]);
+      setIsModalOpen(false);
+
+      // Set current thread in Redux
+      dispatch(setCurrentThread(thread.thread_id));
+
+      // Optional: Show success message
+      showCustomMessageBox(
+        'Version Loaded',
+        `Loaded version ${conversation.version} from ${new Date(
+          conversation.created_at
+        ).toLocaleDateString()}`,
+        'success'
+      );
+    },
+    [
+      diagramType,
+      handleEditNode,
+      setNodes,
+      setEdges,
+      setSelectedNode,
+      setSelectedNodes,
+      setSelectedEdges,
+      setIsModalOpen,
+      dispatch,
+      showCustomMessageBox,
+    ]
+  );
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -367,6 +509,25 @@ export default function Threads({ showCustomMessageBox, onLoadConversation }) {
           </div>
         )}
       </div>
+
+      {/* Modal Components - Same as FlowCanvas */}
+      {selectedNode?.type === 'dbTableNode' ? (
+        <DbTableEditor
+          isOpen={isModalOpen}
+          node={selectedNode}
+          onClose={() => setIsModalOpen(false)}
+          onUpdate={handleUpdateNode}
+          onDelete={handleDeleteNode}
+        />
+      ) : (
+        <EditModal
+          isOpen={isModalOpen}
+          node={selectedNode}
+          onClose={() => setIsModalOpen(false)}
+          onUpdate={handleUpdateNode}
+          onDelete={handleDeleteNode}
+        />
+      )}
     </div>
   );
 }

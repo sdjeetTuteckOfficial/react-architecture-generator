@@ -97,7 +97,7 @@ function FlowCanvas({
     const newEdges = data.edges
       .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
       .map((e, i) => ({ id: e.id || `edge-${i}`, ...e }));
-
+    console.log('new', newNodes, newEdges);
     setNodes(newNodes);
     setEdges(newEdges);
     setTimeout(() => fitView({ padding: 0.2 }), 100);
