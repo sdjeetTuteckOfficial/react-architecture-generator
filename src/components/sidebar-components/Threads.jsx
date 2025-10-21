@@ -236,9 +236,8 @@ export default function Threads({
       setExpandedThread(null);
     } else {
       setExpandedThread(threadId);
-      if (!threadConversations[threadId]) {
-        await fetchConversations(threadId);
-      }
+      // Always fetch fresh conversations when expanding a thread
+      await fetchConversations(threadId);
     }
   };
 
