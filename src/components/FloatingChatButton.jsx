@@ -16,9 +16,10 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { setDiagramType } from '../redux/diagramSlice';
 import { triggerThreadRefresh, setCurrentThread } from '../redux/threadSlice';
+import axiosInstance from '../security/axios-instance';
 
 const FloatingChatButton = ({
-  apiBaseUrl = 'http://localhost:8000',
+  // apiBaseUrl = 'http://localhost:8000',
   handleGenerateDiagram,
   userId = '3fa85f64-5717-4562-b3fc-2c963f66afa6',
 }) => {
@@ -96,33 +97,151 @@ const FloatingChatButton = ({
 
     setIsLoadingThreads(true);
     try {
-      const response = await fetch(
-        `${apiBaseUrl}/architecture/threads?skip=0&limit=100`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      if (response.ok) {
-        const threadsData = await response.json();
+      const response = await axiosInstance.get('/architecture/threads', {
+        params: {
+          skip: 0,
+          limit: 100,
+        },
+      });
+
+      // --- CORRECTIONS START HERE ---
+      // Axios uses response.status for the HTTP status code
+      if (response.status >= 200 && response.status < 300) {
+        // Axios puts the JSON response body directly into response.data
+        const threadsData = response.data;
         setThreads(threadsData);
       } else {
+        // Axios errors for non-2xx statuses are usually caught by the 'catch' block,
+        // but if you have a response interceptor, this might be reachable.
         console.error(
           'Failed to load threads:',
           response.status,
-          response.statusText
+          response.statusText || 'Unknown Error'
         );
         addMessage('bot', '⚠️ Failed to load chat history', true);
       }
+      // --- CORRECTIONS END HERE ---
     } catch (error) {
-      console.error('Error loading threads:', error);
+      // This is the standard Axios error handling for network issues or non-2xx status codes
+      // (unless an interceptor is configured to prevent it).
+      const status = error.response ? error.response.status : 'N/A';
+      const statusText = error.response
+        ? error.response.statusText
+        : 'Network Error';
+
+      console.error('Error loading threads:', status, statusText, error);
       addMessage('bot', '⚠️ Failed to load chat history', true);
     } finally {
       setIsLoadingThreads(false);
     }
   };
+  // const loadThreads = async () => {
+  //   if (!token) {
+  //     console.warn('No auth token available');
+  //     return;
+  //   }
+
+  //   setIsLoadingThreads(true);
+  //   try {
+  //     const response = await axiosInstance.get('/architecture/threads', {
+  //       params: {
+  //         skip: 0,
+  //         limit: 100,
+  //       },
+  //     });
+  //     // const response = await fetch(
+  //     //   `${apiBaseUrl}/architecture/threads?skip=0&limit=100`,
+  //     //   {
+  //     //     headers: {
+  //     //       Authorization: `Bearer ${token}`,
+  //     //       'Content-Type': 'application/json',
+  //     //     },
+  //     //   }
+  //     // );
+  //     if (response.ok) {
+  //       const threadsData = await response.json();
+  //       setThreads(threadsData);
+  //     } else {
+  //       console.error(
+  //         'Failed to load threads:',
+  //         response.status,
+  //         response.statusText
+  //       );
+  //       addMessage('bot', '⚠️ Failed to load chat history', true);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error loading threads:', error);
+  //     addMessage('bot', '⚠️ Failed to load chat history', true);
+  //   } finally {
+  //     setIsLoadingThreads(false);
+  //   }
+  // };
+
+  // const createThread = async () => {
+  //   if (!token || isCreatingThread) return null;
+
+  //   setIsCreatingThread(true);
+  //   console.log('Creating thread...');
+
+  //   try {
+  //     // const response = await fetch(`${apiBaseUrl}/architecture/threads`, {
+  //     //   method: 'POST',
+  //     //   headers: {
+  //     //     Authorization: `Bearer ${token}`,
+  //     //     'Content-Type': 'application/json',
+  //     //   },
+  //     //   body: JSON.stringify({
+  //     //     thread_name: `${
+  //     //       diagramType === 'architecture' ? 'Architecture' : 'Database'
+  //     //     } Chat - ${new Date().toLocaleString()}`,
+  //     //     diagram_type: diagramType,
+  //     //   }),
+  //     // });
+
+  //     const response = await axiosInstance.post('/architecture/threads', {
+  //       thread_name: `${
+  //         diagramType === 'architecture' ? 'Architecture' : 'Database'
+  //       } Chat - ${new Date().toLocaleString()}`,
+  //       diagram_type: diagramType,
+  //     });
+
+  //     if (response.ok) {
+  //       const thread = await response.json();
+  //       const threadId = thread.thread_id || thread.id;
+
+  //       console.log('Thread created successfully:', threadId);
+  //       setCurrentThreadId(threadId);
+  //       setThreads((prev) => [thread, ...prev]);
+
+  //       // Dispatch Redux actions
+  //       dispatch(
+  //         setCurrentThread({
+  //           threadId,
+  //           threadName: thread.thread_name,
+  //           currentVersion: 0,
+  //         })
+  //       );
+  //       dispatch(triggerThreadRefresh()); // Trigger refresh in Threads component
+
+  //       return threadId;
+  //     } else {
+  //       console.error(
+  //         'Failed to create thread:',
+  //         response.status,
+  //         response.statusText
+  //       );
+  //       const errorData = await response.json().catch(() => ({}));
+  //       console.error('Error details:', errorData);
+  //       addMessage('bot', '⚠️ Failed to create new chat thread', true);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error creating thread:', error);
+  //     addMessage('bot', '⚠️ Failed to create new chat thread', true);
+  //   } finally {
+  //     setIsCreatingThread(false);
+  //   }
+  //   return null;
+  // };
 
   const createThread = async () => {
     if (!token || isCreatingThread) return null;
@@ -131,51 +250,46 @@ const FloatingChatButton = ({
     console.log('Creating thread...');
 
     try {
-      const response = await fetch(`${apiBaseUrl}/architecture/threads`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          thread_name: `${
-            diagramType === 'architecture' ? 'Architecture' : 'Database'
-          } Chat - ${new Date().toLocaleString()}`,
-          diagram_type: diagramType,
-        }),
+      const response = await axiosInstance.post('/architecture/threads', {
+        thread_name: `${
+          diagramType === 'architecture' ? 'Architecture' : 'Database'
+        } Chat - ${new Date().toLocaleString()}`,
+        diagram_type: diagramType,
       });
 
-      if (response.ok) {
-        const thread = await response.json();
-        const threadId = thread.thread_id || thread.id;
+      // --- CORRECTIONS START HERE ---
+      // Axios responses have the data directly in response.data
+      const thread = response.data;
+      const threadId = thread.thread_id || thread.id;
 
-        console.log('Thread created successfully:', threadId);
-        setCurrentThreadId(threadId);
-        setThreads((prev) => [thread, ...prev]);
+      // Axios throws an error for non-2xx statuses, so if we reach here, it was successful.
+      console.log('Thread created successfully:', threadId);
+      setCurrentThreadId(threadId);
+      setThreads((prev) => [thread, ...prev]);
 
-        // Dispatch Redux actions
-        dispatch(
-          setCurrentThread({
-            threadId,
-            threadName: thread.thread_name,
-            currentVersion: 0,
-          })
-        );
-        dispatch(triggerThreadRefresh()); // Trigger refresh in Threads component
+      // Dispatch Redux actions
+      dispatch(
+        setCurrentThread({
+          threadId,
+          threadName: thread.thread_name,
+          currentVersion: 0,
+        })
+      );
+      dispatch(triggerThreadRefresh()); // Trigger refresh in Threads component
 
-        return threadId;
-      } else {
-        console.error(
-          'Failed to create thread:',
-          response.status,
-          response.statusText
-        );
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Error details:', errorData);
-        addMessage('bot', '⚠️ Failed to create new chat thread', true);
-      }
+      return threadId;
+      // --- CORRECTIONS END HERE ---
     } catch (error) {
-      console.error('Error creating thread:', error);
+      // This catch block handles both network errors and non-2xx HTTP status codes (4xx, 5xx)
+
+      const status = error.response ? error.response.status : 'N/A';
+      const statusText = error.response
+        ? error.response.statusText
+        : 'Network Error';
+      const errorData = error.response ? error.response.data : error.message;
+
+      console.error('Failed to create thread:', status, statusText);
+      console.error('Error details:', errorData);
       addMessage('bot', '⚠️ Failed to create new chat thread', true);
     } finally {
       setIsCreatingThread(false);
@@ -212,147 +326,304 @@ const FloatingChatButton = ({
         })),
       };
 
-      const response = await fetch(
-        `${apiBaseUrl}/architecture/threads/${threadId}/conversations`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(conversationData),
-        }
+      const response = await axiosInstance.post(
+        `/architecture/threads/${threadId}/conversations`,
+        conversationData
       );
 
-      if (response.ok) {
-        const savedConversation = await response.json();
-        console.log('Conversation saved successfully:', savedConversation);
+      // --- CORRECTIONS START HERE ---
+      // Axios throws an error for non-2xx statuses, so if we reach here, it was successful.
+      // Axios returns the response body directly in the .data property.
+      const savedConversation = response.data;
+      console.log('Conversation saved successfully:', savedConversation);
 
-        setCurrentVersion(currentVersion + 1);
-        setConversationHistory((prev) => [...prev, savedConversation]);
+      setCurrentVersion(currentVersion + 1);
+      setConversationHistory((prev) => [...prev, savedConversation]);
 
-        // Trigger thread refresh in Threads component
-        dispatch(triggerThreadRefresh());
+      // Trigger thread refresh in Threads component
+      dispatch(triggerThreadRefresh());
 
-        addMessage(
-          'bot',
-          `💾 Conversation saved successfully! (Version ${savedConversation.version})`
-        );
-      } else {
-        console.error(
-          'Failed to save conversation:',
-          response.status,
-          response.statusText
-        );
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Save error details:', errorData);
-        addMessage('bot', '⚠️ Failed to save conversation', true);
-      }
+      addMessage(
+        'bot',
+        `💾 Conversation saved successfully! (Version ${savedConversation.version})`
+      );
+      // --- CORRECTIONS END HERE ---
     } catch (error) {
-      console.error('Error saving conversation:', error);
+      // This catch block handles both network errors and non-2xx HTTP status codes (4xx, 5xx)
+
+      const status = error.response ? error.response.status : 'N/A';
+      const statusText = error.response
+        ? error.response.statusText
+        : 'Network Error';
+      const errorData = error.response ? error.response.data : error.message;
+
+      console.error('Error saving conversation:', status, statusText);
+      console.error('Save error details:', errorData);
       addMessage('bot', '⚠️ Failed to save conversation', true);
     } finally {
       setIsSaving(false);
     }
   };
 
+  // const saveConversation = async (threadId, diagramData = null) => {
+  //   if (!threadId || !token) {
+  //     console.warn('Cannot save conversation: missing threadId or token', {
+  //       threadId,
+  //       hasToken: !!token,
+  //     });
+  //     return;
+  //   }
+
+  //   console.log(
+  //     'Saving conversation to thread:',
+  //     threadId,
+  //     'version:',
+  //     currentVersion
+  //   );
+  //   setIsSaving(true);
+
+  //   try {
+  //     const conversationData = {
+  //       thread_id: threadId,
+  //       version: currentVersion,
+  //       diagram_json: diagramData || {},
+  //       messages: messages.map((msg) => ({
+  //         type: msg.type,
+  //         content: msg.content,
+  //         timestamp: msg.timestamp.toISOString(),
+  //       })),
+  //     };
+
+  //     // const response = await fetch(
+  //     //   `${apiBaseUrl}/architecture/threads/${threadId}/conversations`,
+  //     //   {
+  //     //     method: 'POST',
+  //     //     headers: {
+  //     //       Authorization: `Bearer ${token}`,
+  //     //       'Content-Type': 'application/json',
+  //     //     },
+  //     //     body: JSON.stringify(conversationData),
+  //     //   }
+  //     // );
+
+  //     const response = await axiosInstance.post(
+  //       `/architecture/threads/${threadId}/conversations`,
+  //       conversationData
+  //     );
+
+  //     if (response.ok) {
+  //       const savedConversation = await response.json();
+  //       console.log('Conversation saved successfully:', savedConversation);
+
+  //       setCurrentVersion(currentVersion + 1);
+  //       setConversationHistory((prev) => [...prev, savedConversation]);
+
+  //       // Trigger thread refresh in Threads component
+  //       dispatch(triggerThreadRefresh());
+
+  //       addMessage(
+  //         'bot',
+  //         `💾 Conversation saved successfully! (Version ${savedConversation.version})`
+  //       );
+  //     } else {
+  //       console.error(
+  //         'Failed to save conversation:',
+  //         response.status,
+  //         response.statusText
+  //       );
+  //       const errorData = await response.json().catch(() => ({}));
+  //       console.error('Save error details:', errorData);
+  //       addMessage('bot', '⚠️ Failed to save conversation', true);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error saving conversation:', error);
+  //     addMessage('bot', '⚠️ Failed to save conversation', true);
+  //   } finally {
+  //     setIsSaving(false);
+  //   }
+  // };
+
+  // const loadThread = async (threadId) => {
+  //   try {
+  //     // const response = await fetch(
+  //     //   `${apiBaseUrl}/architecture/threads/${threadId}/conversations`,
+  //     //   {
+  //     //     headers: {
+  //     //       Authorization: `Bearer ${token}`,
+  //     //       'Content-Type': 'application/json',
+  //     //     },
+  //     //   }
+  //     // );
+  //     const response = await axiosInstance.get(
+  //       `/architecture/threads/${threadId}/conversations`
+  //     );
+  //     if (response.ok) {
+  //       const conversations = await response.json();
+  //       setConversationHistory(conversations);
+
+  //       if (conversations.length > 0) {
+  //         const sortedConversations = conversations.sort(
+  //           (a, b) => b.version - a.version
+  //         );
+  //         const latestConversation = sortedConversations[0];
+
+  //         let loadedMessages;
+  //         if (
+  //           latestConversation.diagram_json &&
+  //           latestConversation.diagram_json.messages
+  //         ) {
+  //           loadedMessages = latestConversation.diagram_json.messages.map(
+  //             (msg, index) => ({
+  //               id: `loaded-${index}`,
+  //               type: msg.type,
+  //               content: msg.content,
+  //               timestamp: new Date(msg.timestamp),
+  //             })
+  //           );
+  //         } else {
+  //           loadedMessages = [
+  //             {
+  //               id: 'loaded-welcome',
+  //               type: 'bot',
+  //               content: `🔄 Conversation loaded from version ${latestConversation.version}! Your diagram has been restored. You can continue the conversation or ask for updates.`,
+  //               timestamp: new Date(latestConversation.created_at),
+  //             },
+  //           ];
+  //         }
+
+  //         setMessages(loadedMessages);
+  //         setCurrentThreadId(threadId);
+  //         setCurrentVersion(latestConversation.version + 1);
+  //         setShowThreads(false);
+
+  //         // Update Redux
+  //         dispatch(
+  //           setCurrentThread({
+  //             threadId,
+  //             threadName: null,
+  //             currentVersion: latestConversation.version + 1,
+  //           })
+  //         );
+
+  //         if (latestConversation.diagram_json && handleGenerateDiagram) {
+  //           handleGenerateDiagram(latestConversation.diagram_json);
+  //         }
+
+  //         addMessage(
+  //           'bot',
+  //           `🔄 Ready to continue! Current version: ${latestConversation.version}. What would you like to update?`
+  //         );
+  //       }
+  //     } else {
+  //       console.error('Failed to load conversations:', response.status);
+  //       addMessage('bot', '⚠️ Failed to load conversation history', true);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error loading thread:', error);
+  //     addMessage('bot', '⚠️ Failed to load conversation', true);
+  //   }
+  // };
+
   const loadThread = async (threadId) => {
     try {
-      const response = await fetch(
-        `${apiBaseUrl}/architecture/threads/${threadId}/conversations`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
+      const response = await axiosInstance.get(
+        `/architecture/threads/${threadId}/conversations`
       );
-      if (response.ok) {
-        const conversations = await response.json();
-        setConversationHistory(conversations);
 
-        if (conversations.length > 0) {
-          const sortedConversations = conversations.sort(
-            (a, b) => b.version - a.version
-          );
-          const latestConversation = sortedConversations[0];
+      // --- CORRECTIONS START HERE ---
+      // If the code reaches here, the request was successful (HTTP status 2xx).
+      // Axios returns the response body directly in the .data property.
+      const conversations = response.data;
+      setConversationHistory(conversations);
 
-          let loadedMessages;
-          if (
-            latestConversation.diagram_json &&
-            latestConversation.diagram_json.messages
-          ) {
-            loadedMessages = latestConversation.diagram_json.messages.map(
-              (msg, index) => ({
-                id: `loaded-${index}`,
-                type: msg.type,
-                content: msg.content,
-                timestamp: new Date(msg.timestamp),
-              })
-            );
-          } else {
-            loadedMessages = [
-              {
-                id: 'loaded-welcome',
-                type: 'bot',
-                content: `🔄 Conversation loaded from version ${latestConversation.version}! Your diagram has been restored. You can continue the conversation or ask for updates.`,
-                timestamp: new Date(latestConversation.created_at),
-              },
-            ];
-          }
+      if (conversations.length > 0) {
+        const sortedConversations = conversations.sort(
+          (a, b) => b.version - a.version
+        );
+        const latestConversation = sortedConversations[0];
 
-          setMessages(loadedMessages);
-          setCurrentThreadId(threadId);
-          setCurrentVersion(latestConversation.version + 1);
-          setShowThreads(false);
-
-          // Update Redux
-          dispatch(
-            setCurrentThread({
-              threadId,
-              threadName: null,
-              currentVersion: latestConversation.version + 1,
+        let loadedMessages;
+        if (
+          latestConversation.diagram_json &&
+          latestConversation.diagram_json.messages
+        ) {
+          loadedMessages = latestConversation.diagram_json.messages.map(
+            (msg, index) => ({
+              id: `loaded-${index}`,
+              type: msg.type,
+              content: msg.content,
+              timestamp: new Date(msg.timestamp),
             })
           );
-
-          if (latestConversation.diagram_json && handleGenerateDiagram) {
-            handleGenerateDiagram(latestConversation.diagram_json);
-          }
-
-          addMessage(
-            'bot',
-            `🔄 Ready to continue! Current version: ${latestConversation.version}. What would you like to update?`
-          );
+        } else {
+          loadedMessages = [
+            {
+              id: 'loaded-welcome',
+              type: 'bot',
+              content: `🔄 Conversation loaded from version ${latestConversation.version}! Your diagram has been restored. You can continue the conversation or ask for updates.`,
+              timestamp: new Date(latestConversation.created_at),
+            },
+          ];
         }
-      } else {
-        console.error('Failed to load conversations:', response.status);
-        addMessage('bot', '⚠️ Failed to load conversation history', true);
-      }
+
+        setMessages(loadedMessages);
+        setCurrentThreadId(threadId);
+        setCurrentVersion(latestConversation.version + 1);
+        setShowThreads(false);
+
+        // Update Redux
+        dispatch(
+          setCurrentThread({
+            threadId,
+            threadName: null,
+            currentVersion: latestConversation.version + 1,
+          })
+        );
+
+        if (latestConversation.diagram_json && handleGenerateDiagram) {
+          handleGenerateDiagram(latestConversation.diagram_json);
+        }
+
+        addMessage(
+          'bot',
+          `🔄 Ready to continue! Current version: ${latestConversation.version}. What would you like to update?`
+        );
+      } // End of if (conversations.length > 0)
+      // --- CORRECTIONS END HERE ---
     } catch (error) {
-      console.error('Error loading thread:', error);
+      // This catch block handles network errors AND non-2xx HTTP status codes
+      const status = error.response ? error.response.status : 'N/A';
+      const statusText = error.response
+        ? error.response.statusText
+        : 'Network Error';
+
+      console.error('Error loading thread:', status, statusText, error);
       addMessage('bot', '⚠️ Failed to load conversation', true);
     }
   };
 
   const analyzeProject = async (description) => {
     try {
-      const response = await fetch(`${apiBaseUrl}/architecture/analyze`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ description }),
+      const response = await axiosInstance.post('/architecture/analyze', {
+        description,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
+      // --- CORRECTIONS START HERE ---
+      // 1. Axios automatically throws an error for non-2xx statuses, which
+      //    sends execution to the catch block, replacing the manual 'if (!response.ok)' check.
+      // 2. Axios returns the response body (already parsed as JSON) in the .data property.
+      return response.data;
+      // --- CORRECTIONS END HERE ---
     } catch (error) {
-      console.error('Error analyzing project:', error);
-      throw error;
+      // This catch block handles both network errors and non-2xx HTTP status codes.
+      const status = error.response ? error.response.status : 'N/A';
+      const statusText = error.response
+        ? error.response.statusText
+        : 'Network Error';
+      const errorData = error.response ? error.response.data : error.message;
+
+      console.error('Error analyzing project:', status, statusText, errorData);
+      throw error; // Re-throw the error for the calling function to handle
     }
   };
 
@@ -363,37 +634,114 @@ const FloatingChatButton = ({
     type = 'architecture'
   ) => {
     try {
-      const response = await fetch(
-        `${apiBaseUrl}/architecture/generate-diagram`,
+      const response = await axiosInstance.post(
+        '/architecture/generate-diagram',
         {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            description,
-            context: context || {},
-            clarification_responses: responses || {},
-            diagram_type: type,
-          }),
+          description,
+          context: context || {},
+          clarification_responses: responses || {},
+          diagram_type: type,
         }
       );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      // --- CORRECTIONS START HERE ---
+      // 1. Axios automatically throws an error for non-2xx statuses, which
+      //    sends execution to the catch block, replacing the manual 'if (!response.ok)' check.
+      // 2. Axios returns the response body (already parsed as JSON) in the .data property.
+      const res = response.data;
 
-      const res = await response.json();
       if (handleGenerateDiagram) {
         handleGenerateDiagram(res);
       }
       return res;
+      // --- CORRECTIONS END HERE ---
     } catch (error) {
-      console.error('Error generating diagram:', error);
-      throw error;
+      // This catch block handles both network errors and non-2xx HTTP status codes.
+      const status = error.response ? error.response.status : 'N/A';
+      const statusText = error.response
+        ? error.response.statusText
+        : 'Network Error';
+      const errorData = error.response ? error.response.data : error.message;
+
+      console.error('Error generating diagram:', status, statusText, errorData);
+      throw error; // Re-throw the error for the calling function to handle
     }
   };
+
+  // const analyzeProject = async (description) => {
+  //   try {
+  //     // const response = await fetch(`${apiBaseUrl}/architecture/analyze`, {
+  //     //   method: 'POST',
+  //     //   headers: {
+  //     //     Authorization: `Bearer ${token}`,
+  //     //     'Content-Type': 'application/json',
+  //     //   },
+  //     //   body: JSON.stringify({ description }),
+  //     // });
+
+  //     const response = await axiosInstance.post('/architecture/analyze', {
+  //       description,
+  //     });
+
+  //     if (!response.ok) {
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
+
+  //     return await response.json();
+  //   } catch (error) {
+  //     console.error('Error analyzing project:', error);
+  //     throw error;
+  //   }
+  // };
+
+  // const generateDiagram = async (
+  //   description,
+  //   context,
+  //   responses,
+  //   type = 'architecture'
+  // ) => {
+  //   try {
+  //     // const response = await fetch(
+  //     //   `${apiBaseUrl}/architecture/generate-diagram`,
+  //     //   {
+  //     //     method: 'POST',
+  //     //     headers: {
+  //     //       Authorization: `Bearer ${token}`,
+  //     //       'Content-Type': 'application/json',
+  //     //     },
+  //     //     body: JSON.stringify({
+  //     //       description,
+  //     //       context: context || {},
+  //     //       clarification_responses: responses || {},
+  //     //       diagram_type: type,
+  //     //     }),
+  //     //   }
+  //     // );
+
+  //     const response = await axiosInstance.post(
+  //       '/architecture/generate-diagram',
+  //       {
+  //         description,
+  //         context: context || {},
+  //         clarification_responses: responses || {},
+  //         diagram_type: type,
+  //       }
+  //     );
+
+  //     if (!response.ok) {
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
+
+  //     const res = await response.json();
+  //     if (handleGenerateDiagram) {
+  //       handleGenerateDiagram(res);
+  //     }
+  //     return res;
+  //   } catch (error) {
+  //     console.error('Error generating diagram:', error);
+  //     throw error;
+  //   }
+  // };
 
   const ensureThreadExists = async () => {
     if (currentThreadId) {

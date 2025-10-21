@@ -29,7 +29,7 @@ import {
   processImagePath,
   isWithinBounds,
 } from '../hooks/useFlowStates';
-import FloatingChatButton from './FloatingChatButton';
+import FloatingChatButton from './chat/FloatingChatButton';
 
 // FlowCanvas now accepts all flow state and setters as props
 function FlowCanvas({
@@ -568,7 +568,7 @@ function FlowCanvas({
 
       {/* <ChatInput onSubmit={handleGenerateDiagram} /> */}
       <FloatingChatButton
-        apiBaseUrl='http://localhost:8000'
+        // apiBaseUrl='http://localhost:8000'
         handleGenerateDiagram={handleDiagramUpdate}
       />
     </>
