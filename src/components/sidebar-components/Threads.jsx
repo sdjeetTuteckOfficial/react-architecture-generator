@@ -12,15 +12,16 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   setCurrentThread,
   setConversationHistory,
+  resetThreadRefresh,
+  selectShouldRefreshThreads,
 } from '../../redux/threadSlice';
-import { processImagePath } from '../../hooks/useFlowStates'; // Import the utility function
+import { processImagePath } from '../../hooks/useFlowStates';
 import DbTableEditor from '../DbTableEditor';
 import EditModal from '../EditModal';
 
 export default function Threads({
   showCustomMessageBox,
   onLoadConversation,
-  // Props from parent FlowCanvas
   nodes,
   setNodes,
   onNodesChange,
@@ -50,10 +51,11 @@ export default function Threads({
   const scrollContainerRef = useRef(null);
   const dispatch = useDispatch();
 
-  // Get diagramType from Redux store
+  // Get states from Redux
   const diagramType = useSelector((state) => state.diagram.diagramType);
+  const shouldRefreshThreads = useSelector(selectShouldRefreshThreads);
 
-  // Create handleEditNode function similar to FlowCanvas
+  // Create handleEditNode function
   const handleEditNode = useCallback(
     (nodeId) => {
       setNodes((currentNodes) => {
@@ -135,7 +137,6 @@ export default function Threads({
       setThreads((prev) => {
         return newSkip === 0 ? data : [...prev, ...data];
       });
-      // setThreads((prev) => [...prev, ...data]);
       setHasMore(data.length === limit);
     } catch (err) {
       console.error('Error fetching threads:', err);
@@ -195,9 +196,20 @@ export default function Threads({
     }
   };
 
+  // Initial load
   useEffect(() => {
     fetchThreads(skip);
   }, [skip]);
+
+  // Listen for refresh trigger from FloatingChatButton
+  useEffect(() => {
+    if (shouldRefreshThreads) {
+      console.log('Refresh triggered from chat - reloading threads');
+      setSkip(0); // Reset to beginning
+      fetchThreads(0); // Fetch from start
+      dispatch(resetThreadRefresh()); // Reset the flag
+    }
+  }, [shouldRefreshThreads, dispatch]);
 
   const handleScroll = () => {
     const container = scrollContainerRef.current;
@@ -232,22 +244,18 @@ export default function Threads({
 
   const handleLoadVersion = useCallback(
     (thread, conversation) => {
-      // Process nodes and edges similar to handleDiagramUpdate in FlowCanvas
       if (conversation.diagram_json && conversation.diagram_json.nodes) {
         const processedNodes = conversation.diagram_json.nodes.map((node) => {
           let nodeType = 'custom';
           let nodeData = {
             ...node.data,
-            onEdit: handleEditNode, // Attach the handleEditNode function
+            onEdit: handleEditNode,
           };
-
-          console.log('diagramType', diagramType);
 
           if (diagramType === 'architecture') {
             nodeType = node.data.image ? 'custom' : 'default';
             nodeData.image = processImagePath(node.data.image);
           } else if (diagramType === 'db_diagram') {
-            console.log('Creating DB node:', nodeType, node.data);
             nodeType = 'dbTableNode';
           }
 
@@ -274,16 +282,13 @@ export default function Threads({
         setEdges(processedEdges);
       }
 
-      // Clear any selections when loading a new version
       setSelectedNode(null);
       setSelectedNodes([]);
       setSelectedEdges([]);
       setIsModalOpen(false);
 
-      // Set current thread in Redux
       dispatch(setCurrentThread(thread.thread_id));
 
-      // Optional: Show success message
       showCustomMessageBox(
         'Version Loaded',
         `Loaded version ${conversation.version} from ${new Date(
@@ -329,6 +334,7 @@ export default function Threads({
         <button
           className='p-1 hover:bg-gray-100 rounded transition-colors'
           title='Create new thread'
+          onClick={() => fetchThreads(0)}
         >
           <Plus size={14} className='text-gray-500' />
         </button>
@@ -361,7 +367,7 @@ export default function Threads({
                 key={thread.thread_id}
                 className='border-b border-gray-100 last:border-b-0'
               >
-                {/* Thread Header - Compact */}
+                {/* Thread Header */}
                 <button
                   onClick={() => handleThreadExpand(thread.thread_id)}
                   className='w-full p-2 hover:bg-gray-100 transition-colors flex items-center text-left'
@@ -394,7 +400,7 @@ export default function Threads({
                   )}
                 </button>
 
-                {/* Conversation Timeline - Compact */}
+                {/* Conversation Timeline */}
                 {expandedThread === thread.thread_id && (
                   <div className='bg-white border-t border-gray-100'>
                     {loadingConversations[thread.thread_id] ? (
@@ -418,7 +424,7 @@ export default function Threads({
                               }
                               className='w-full px-2 py-1.5 hover:bg-blue-50 transition-colors flex items-center gap-2 group'
                             >
-                              {/* Timeline indicator - Smaller */}
+                              {/* Timeline indicator */}
                               <div className='flex flex-col items-center'>
                                 <div
                                   className={`w-1.5 h-1.5 rounded-full ${
@@ -437,7 +443,7 @@ export default function Threads({
                                 )}
                               </div>
 
-                              {/* Version info - Compact */}
+                              {/* Version info */}
                               <div className='flex-1 text-left'>
                                 <div className='flex items-center gap-1'>
                                   <Layers size={10} className='text-gray-400' />
@@ -510,7 +516,7 @@ export default function Threads({
         )}
       </div>
 
-      {/* Modal Components - Same as FlowCanvas */}
+      {/* Modal Components */}
       {selectedNode?.type === 'dbTableNode' ? (
         <DbTableEditor
           isOpen={isModalOpen}

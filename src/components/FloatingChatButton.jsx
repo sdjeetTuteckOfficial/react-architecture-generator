@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import { setDiagramType } from '../redux/diagramSlice';
+import { triggerThreadRefresh, setCurrentThread } from '../redux/threadSlice';
 
 const FloatingChatButton = ({
   apiBaseUrl = 'http://localhost:8000',
@@ -47,7 +48,6 @@ const FloatingChatButton = ({
   const [isCreatingThread, setIsCreatingThread] = useState(false);
   const [currentVersion, setCurrentVersion] = useState(0);
   const [conversationHistory, setConversationHistory] = useState([]);
-  const [hasGeneratedDiagram, setHasGeneratedDiagram] = useState(false);
 
   const diagramType = useSelector((state) => state.diagram.diagramType);
   const dispatch = useDispatch();
@@ -96,7 +96,6 @@ const FloatingChatButton = ({
 
     setIsLoadingThreads(true);
     try {
-      // FIXED: Remove user_id parameter - backend gets it from token
       const response = await fetch(
         `${apiBaseUrl}/architecture/threads?skip=0&limit=100`,
         {
@@ -138,7 +137,6 @@ const FloatingChatButton = ({
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        // FIXED: Remove user_id from body - backend sets it from token
         body: JSON.stringify({
           thread_name: `${
             diagramType === 'architecture' ? 'Architecture' : 'Database'
@@ -154,6 +152,16 @@ const FloatingChatButton = ({
         console.log('Thread created successfully:', threadId);
         setCurrentThreadId(threadId);
         setThreads((prev) => [thread, ...prev]);
+
+        // Dispatch Redux actions
+        dispatch(
+          setCurrentThread({
+            threadId,
+            threadName: thread.thread_name,
+            currentVersion: 0,
+          })
+        );
+        dispatch(triggerThreadRefresh()); // Trigger refresh in Threads component
 
         return threadId;
       } else {
@@ -196,7 +204,7 @@ const FloatingChatButton = ({
       const conversationData = {
         thread_id: threadId,
         version: currentVersion,
-        diagram_json: diagramData || {}, // Always include diagram_json as it's required
+        diagram_json: diagramData || {},
         messages: messages.map((msg) => ({
           type: msg.type,
           content: msg.content,
@@ -220,9 +228,11 @@ const FloatingChatButton = ({
         const savedConversation = await response.json();
         console.log('Conversation saved successfully:', savedConversation);
 
-        // Update current version and add to history
         setCurrentVersion(currentVersion + 1);
         setConversationHistory((prev) => [...prev, savedConversation]);
+
+        // Trigger thread refresh in Threads component
+        dispatch(triggerThreadRefresh());
 
         addMessage(
           'bot',
@@ -262,16 +272,11 @@ const FloatingChatButton = ({
         setConversationHistory(conversations);
 
         if (conversations.length > 0) {
-          // Sort conversations by version to get the latest one
           const sortedConversations = conversations.sort(
             (a, b) => b.version - a.version
           );
           const latestConversation = sortedConversations[0];
 
-          // Mark that we've generated a diagram since we're loading an existing thread
-          setHasGeneratedDiagram(true);
-
-          // Load messages from diagram_json metadata if available, otherwise create default messages
           let loadedMessages;
           if (
             latestConversation.diagram_json &&
@@ -286,7 +291,6 @@ const FloatingChatButton = ({
               })
             );
           } else {
-            // Create a default message for threads without stored messages
             loadedMessages = [
               {
                 id: 'loaded-welcome',
@@ -302,7 +306,15 @@ const FloatingChatButton = ({
           setCurrentVersion(latestConversation.version + 1);
           setShowThreads(false);
 
-          // Load the diagram data
+          // Update Redux
+          dispatch(
+            setCurrentThread({
+              threadId,
+              threadName: null,
+              currentVersion: latestConversation.version + 1,
+            })
+          );
+
           if (latestConversation.diagram_json && handleGenerateDiagram) {
             handleGenerateDiagram(latestConversation.diagram_json);
           }
@@ -413,7 +425,6 @@ const FloatingChatButton = ({
 
     try {
       if (awaitingClarification && currentAnalysis) {
-        // Handle clarification response
         const questionIndex = Object.keys(clarificationResponses).length;
         const newResponses = {
           ...clarificationResponses,
@@ -425,14 +436,12 @@ const FloatingChatButton = ({
           Object.keys(newResponses).length >=
           currentAnalysis.clarification_questions.length
         ) {
-          // All questions answered, generate diagram
           setAwaitingClarification(false);
           addMessage(
             'bot',
             `🎨 Perfect! I have everything I need. Crafting your ${diagramType} diagram with some AI magic...`
           );
 
-          // Ensure thread exists before generating diagram
           const threadId = await ensureThreadExists();
 
           const diagramData = await generateDiagram(
@@ -453,28 +462,14 @@ const FloatingChatButton = ({
             } smart connections. Check it out in your main workspace!`
           );
 
-          // Save conversation with diagram data
           if (threadId) {
-            console.log(
-              'Saving conversation with diagram data to thread:',
-              threadId
-            );
             await saveConversation(threadId, diagramData);
-          } else {
-            console.warn('No thread ID available for saving conversation');
-            addMessage(
-              'bot',
-              '⚠️ Diagram created but conversation not saved - failed to create thread'
-            );
           }
 
-          // Trigger diagram update in parent component if callback provided
           if (window.updateDiagramFromChat) {
-            console.log('Updating parent diagram via window callback');
             window.updateDiagramFromChat(diagramData);
           }
         } else {
-          // Ask next question
           const nextQuestionIndex = Object.keys(newResponses).length;
           addMessage(
             'bot',
@@ -482,7 +477,6 @@ const FloatingChatButton = ({
           );
         }
       } else {
-        // Initial analysis - ensure thread exists first
         const threadId = await ensureThreadExists();
 
         const analysis = await analyzeProject(userMessage);
@@ -504,7 +498,6 @@ const FloatingChatButton = ({
           );
           addMessage('bot', `🎯 ${analysis.clarification_questions[0]}`);
         } else {
-          // Generate diagram directly
           addMessage(
             'bot',
             `🎉 Excellent! Your ${analysis.project_domain} project looks great. Let me generate your ${diagramType} diagram now...`
@@ -526,23 +519,11 @@ const FloatingChatButton = ({
             } components and ${diagramData.edges?.length || 0} connections!`
           );
 
-          // Save conversation with diagram data
           if (threadId) {
-            console.log(
-              'Saving conversation with diagram data to thread:',
-              threadId
-            );
             await saveConversation(threadId, diagramData);
-          } else {
-            console.warn('No thread ID available for saving conversation');
-            addMessage(
-              'bot',
-              '⚠️ Diagram created but conversation not saved - failed to create thread'
-            );
           }
 
           if (window.updateDiagramFromChat) {
-            console.log('Updating parent diagram via window callback');
             window.updateDiagramFromChat(diagramData);
           }
         }
@@ -578,7 +559,6 @@ const FloatingChatButton = ({
     setCurrentThreadId(null);
     setCurrentVersion(0);
     setConversationHistory([]);
-    setHasGeneratedDiagram(false); // Reset the flag
     setMessages([
       {
         id: `${Date.now()}-reset`,
@@ -596,10 +576,8 @@ const FloatingChatButton = ({
   };
 
   const handleSaveCurrentChat = async () => {
-    // Ensure thread exists before saving
     const threadId = await ensureThreadExists();
 
-    // Save the conversation
     if (threadId) {
       await saveConversation(threadId);
     } else {
@@ -620,11 +598,9 @@ const FloatingChatButton = ({
             isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'
           }`}
         >
-          {/* Pulse Rings */}
           <div className='absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 animate-ping opacity-20'></div>
           <div className='absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 animate-pulse opacity-30'></div>
 
-          {/* Main Button */}
           <button
             onClick={() => setIsOpen(true)}
             className='relative bg-gradient-to-r from-blue-600 via-purple-600 to-blue-700 hover:from-blue-700 hover:via-purple-700 hover:to-blue-800 text-white rounded-full p-4 shadow-2xl transition-all duration-300 hover:scale-110 group'
@@ -638,12 +614,11 @@ const FloatingChatButton = ({
         </div>
       </div>
 
-      {/* Chat Window with Glassmorphism */}
+      {/* Chat Window - Rest of the component remains same */}
       {isOpen && (
         <div className='fixed bottom-6 right-6 z-50 w-[420px] h-[90vh] backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 rounded-2xl shadow-2xl border border-white/20 flex flex-col overflow-hidden transition-all duration-500 animate-in slide-in-from-bottom-10'>
-          {/* Header with Gradient */}
+          {/* Header */}
           <div className='relative bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 text-white p-5 rounded-t-2xl'>
-            {/* Animated Background Pattern */}
             <div className='absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 opacity-90'></div>
             <div
               className='absolute inset-0 animate-pulse'
@@ -671,7 +646,6 @@ const FloatingChatButton = ({
                 </div>
               </div>
               <div className='flex items-center space-x-2'>
-                {/* Thread History Button */}
                 <button
                   onClick={() => setShowThreads(!showThreads)}
                   className='w-8 h-8 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-all duration-200 flex items-center justify-center group'
@@ -682,7 +656,6 @@ const FloatingChatButton = ({
                     className='text-white group-hover:scale-110 transition-transform duration-200'
                   />
                 </button>
-                {/* Save Button */}
                 {token && (
                   <button
                     onClick={handleSaveCurrentChat}
@@ -773,7 +746,7 @@ const FloatingChatButton = ({
             </div>
           )}
 
-          {/* Mode Selector with Pills */}
+          {/* Mode Selector */}
           <div className='p-4 bg-gradient-to-r from-gray-50 to-blue-50/50 border-b border-gray-100/50'>
             <div className='flex items-center justify-between'>
               <div className='flex space-x-2'>
@@ -807,7 +780,7 @@ const FloatingChatButton = ({
             </div>
           </div>
 
-          {/* Messages with Better Styling */}
+          {/* Messages */}
           <div className='flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-transparent to-gray-50/30'>
             {messages.map((message, index) => (
               <div
@@ -898,7 +871,7 @@ const FloatingChatButton = ({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Enhanced Input Area */}
+          {/* Input Area */}
           <div className='p-4 bg-gradient-to-r from-white/50 to-gray-50/50 backdrop-blur-sm border-t border-gray-100/50'>
             <div className='flex space-x-3'>
               <input
@@ -962,7 +935,6 @@ const FloatingChatButton = ({
                 </div>
               </div>
             )}
-            {/* Thread Status Indicator */}
             <div className='mt-2 flex items-center justify-between text-xs text-gray-500'>
               <span className='flex items-center gap-1'>
                 {currentThreadId ? (
@@ -981,7 +953,6 @@ const FloatingChatButton = ({
                 </span>
               )}
             </div>
-            {/* Conversation Help Text */}
             {currentThreadId && !awaitingClarification && (
               <div className='mt-2 text-xs text-blue-600 bg-blue-50 rounded-lg p-2'>
                 💡 You can now ask me to update, modify, or enhance your

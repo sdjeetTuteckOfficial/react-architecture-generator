@@ -1,4 +1,3 @@
-// redux/threadSlice.js
 import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
@@ -11,6 +10,7 @@ const initialState = {
   selectedConversation: null,
   isLoadingThread: false,
   error: null,
+  shouldRefreshThreads: false, // NEW FLAG
 };
 
 const threadSlice = createSlice({
@@ -18,11 +18,16 @@ const threadSlice = createSlice({
   initialState,
   reducers: {
     setCurrentThread: (state, action) => {
-      state.currentThread = {
-        threadId: action.payload.threadId,
-        threadName: action.payload.threadName,
-        currentVersion: action.payload.currentVersion,
-      };
+      // Handle both object and string payload
+      if (typeof action.payload === 'string') {
+        state.currentThread.threadId = action.payload;
+      } else {
+        state.currentThread = {
+          threadId: action.payload.threadId,
+          threadName: action.payload.threadName || null,
+          currentVersion: action.payload.currentVersion || 0,
+        };
+      }
     },
     setConversationHistory: (state, action) => {
       const { threadId, conversations } = action.payload;
@@ -50,6 +55,13 @@ const threadSlice = createSlice({
         state.currentThread.currentVersion += 1;
       }
     },
+    // NEW ACTIONS
+    triggerThreadRefresh: (state) => {
+      state.shouldRefreshThreads = true;
+    },
+    resetThreadRefresh: (state) => {
+      state.shouldRefreshThreads = false;
+    },
   },
 });
 
@@ -61,6 +73,8 @@ export const {
   setLoadingThread,
   setThreadError,
   incrementVersion,
+  triggerThreadRefresh,
+  resetThreadRefresh,
 } = threadSlice.actions;
 
 // Selectors
@@ -71,5 +85,7 @@ export const selectSelectedConversation = (state) =>
   state.thread.selectedConversation;
 export const selectThreadLoading = (state) => state.thread.isLoadingThread;
 export const selectThreadError = (state) => state.thread.error;
+export const selectShouldRefreshThreads = (state) =>
+  state.thread.shouldRefreshThreads;
 
 export default threadSlice.reducer;
