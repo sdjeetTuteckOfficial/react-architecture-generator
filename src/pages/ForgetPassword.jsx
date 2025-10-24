@@ -10,6 +10,7 @@ import {
   User,
 } from 'lucide-react';
 import gunevoLogo from '/public/images/gunevo.svg';
+import axiosInstance from '../security/axios-instance';
 
 const PasswordResetStepper = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -68,8 +69,70 @@ const PasswordResetStepper = () => {
     }
     setCurrentStep(2);
   };
+  // const handleStep1Submit = (e) => {
+  //   e.preventDefault();
+  //   if (!formData.newPassword) {
+  //     setError('Please enter a new password.');
+  //     return;
+  //   }
+  //   if (!validatePassword(formData.newPassword)) {
+  //     setError('Password must be at least 8 characters long.');
+  //     return;
+  //   }
+  //   if (formData.newPassword !== formData.confirmPassword) {
+  //     setError('Passwords do not match.');
+  //     return;
+  //   }
+  //   setCurrentStep(2);
+  // };
 
   // Step 2: Email
+  // const handleStep2Submit = async (e) => {
+  //   e.preventDefault();
+  //   if (!formData.email) {
+  //     setError('Please enter your email address.');
+  //     return;
+  //   }
+  //   if (!validateEmail(formData.email)) {
+  //     setError('Please enter a valid email address.');
+  //     return;
+  //   }
+
+  //   setIsLoading(true);
+  //   setError('');
+
+  //   try {
+  //     const response = await fetch(
+  //       'http://localhost:8000/auth/forgot-password',
+  //       {
+  //         method: 'POST',
+  //         headers: { 'Content-Type': 'application/json' },
+  //         body: JSON.stringify({ email: formData.email }),
+  //       }
+  //     );
+
+  //     if (!response.ok) throw new Error('Network error');
+
+  //     const data = await response.json();
+
+  //     if (data.message) {
+  //       setSuccessMessage(
+  //         data.otp ? `${data.message}. OTP: ${data.otp}` : data.message
+  //       );
+  //       setTimeout(() => {
+  //         setCurrentStep(3);
+  //         setSuccessMessage('');
+  //       }, 2000);
+  //     } else {
+  //       setError('Unexpected response from server.');
+  //     }
+  //   } catch (err) {
+  //     setError('Failed to send reset request. Please try again.');
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
+
   const handleStep2Submit = async (e) => {
     e.preventDefault();
     if (!formData.email) {
@@ -85,20 +148,15 @@ const PasswordResetStepper = () => {
     setError('');
 
     try {
-      const response = await fetch(
-        'http://localhost:8000/auth/forgot-password',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.email }),
-        }
-      );
+      // NOTE: axiosInstance already handles the base URL and 'Content-Type': 'application/json' is default for POST
+      const response = await axiosInstance.post('/auth/forgot-password', {
+        email: formData.email,
+      });
 
-      if (!response.ok) throw new Error('Network error');
-
-      const data = await response.json();
+      const data = response.data;
 
       if (data.message) {
+        // Caution: Displaying the OTP is a security risk, only do this in a controlled dev environment.
         setSuccessMessage(
           data.otp ? `${data.message}. OTP: ${data.otp}` : data.message
         );
@@ -110,20 +168,71 @@ const PasswordResetStepper = () => {
         setError('Unexpected response from server.');
       }
     } catch (err) {
-      setError('Failed to send reset request. Please try again.');
+      // Axios error handling: Use err.response.data for server messages
+      const errorMessage =
+        err.response && err.response.data && err.response.data.message
+          ? err.response.data.message
+          : 'Failed to send reset request. Please try again.';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
   // Step 3: OTP Verification
+  // const handleStep3Submit = async (e) => {
+  //   e.preventDefault();
+  //   if (!formData.otp) {
+  //     setError('Please enter the OTP.');
+  //     return;
+  //   }
+  //   if (formData.otp.length !== 6) {
+  //     setError('OTP must be 6 digits.');
+  //     return;
+  //   }
+
+  //   setIsLoading(true);
+  //   setError('');
+
+  //   try {
+  //     const response = await fetch(
+  //       'http://localhost:8000/auth/reset-password',
+  //       {
+  //         method: 'POST',
+  //         headers: { 'Content-Type': 'application/json' },
+  //         body: JSON.stringify({
+  //           email: formData.email,
+  //           otp: formData.otp,
+  //           new_password: formData.newPassword,
+  //         }),
+  //       }
+  //     );
+
+  //     if (!response.ok) throw new Error('Failed to reset password');
+
+  //     const data = await response.json();
+
+  //     if (data.message) {
+  //       setSuccessMessage('Password reset successfully!');
+  //       setTimeout(() => setCurrentStep(4), 1500);
+  //     } else {
+  //       setError('Failed to reset password. Please try again.');
+  //     }
+  //   } catch (err) {
+  //     setError('Failed to reset password. Please try again.');
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
+
   const handleStep3Submit = async (e) => {
     e.preventDefault();
     if (!formData.otp) {
       setError('Please enter the OTP.');
       return;
     }
-    if (formData.otp.length !== 6) {
+    // Using simple digit check for better user experience
+    if (!/^\d{6}$/.test(formData.otp)) {
       setError('OTP must be 6 digits.');
       return;
     }
@@ -132,22 +241,14 @@ const PasswordResetStepper = () => {
     setError('');
 
     try {
-      const response = await fetch(
-        'http://localhost:8000/auth/reset-password',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: formData.email,
-            otp: formData.otp,
-            new_password: formData.newPassword,
-          }),
-        }
-      );
+      // NOTE: axiosInstance already handles the base URL
+      const response = await axiosInstance.post('/auth/reset-password', {
+        email: formData.email,
+        otp: formData.otp,
+        new_password: formData.newPassword,
+      });
 
-      if (!response.ok) throw new Error('Failed to reset password');
-
-      const data = await response.json();
+      const data = response.data;
 
       if (data.message) {
         setSuccessMessage('Password reset successfully!');
@@ -156,7 +257,12 @@ const PasswordResetStepper = () => {
         setError('Failed to reset password. Please try again.');
       }
     } catch (err) {
-      setError('Failed to reset password. Please try again.');
+      // Axios error handling: Use err.response.data for server messages
+      const errorMessage =
+        err.response && err.response.data && err.response.data.message
+          ? err.response.data.message
+          : 'Failed to reset password. Please try again.';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

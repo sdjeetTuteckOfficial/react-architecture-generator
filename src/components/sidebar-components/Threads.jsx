@@ -18,6 +18,7 @@ import {
 import { processImagePath } from '../../hooks/useFlowStates';
 import DbTableEditor from '../DbTableEditor';
 import EditModal from '../EditModal';
+import axiosInstance from '../../security/axios-instance';
 
 export default function Threads({
   showCustomMessageBox,
@@ -118,32 +119,39 @@ export default function Threads({
     setLoadingThreads(true);
     setError(null);
     try {
-      const response = await fetch(
-        `http://localhost:8000/architecture/threads?skip=${newSkip}&limit=${limit}`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const response = await axiosInstance.get('/architecture/threads', {
+        params: {
+          skip: newSkip,
+          limit: limit, // Assuming 'limit' is available in scope
+        },
+        // Note: The baseURL (http://localhost:8000/) and Authorization header
+        // are automatically handled by the axiosInstance configuration/interceptors.
+      });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      // --- CORRECTIONS START HERE ---
+      // Axios throws an error for non-2xx statuses, replacing the manual '!response.ok' check.
+      // Axios returns the JSON response body directly in response.data.
+      const data = response.data;
 
-      const data = await response.json();
       setThreads((prev) => {
         return newSkip === 0 ? data : [...prev, ...data];
       });
       setHasMore(data.length === limit);
+      // --- CORRECTIONS END HERE ---
     } catch (err) {
+      // Axios error handling for non-2xx status codes and network errors
       console.error('Error fetching threads:', err);
-      setError('Failed to fetch threads. Please try again.');
+
+      // Log detailed error information from the Axios error structure
+      const status = err.response ? err.response.status : 'N/A';
+      const errorDetail = err.response
+        ? err.response.data.detail || 'Server error'
+        : 'Network error';
+
+      setError(`Failed to fetch threads: ${errorDetail}`);
       showCustomMessageBox(
         'Fetch Error',
-        'Failed to load threads. Please check your connection or authentication.',
+        `Failed to load threads (Status: ${status}). Please check your connection or authentication.`,
         'error'
       );
     } finally {
@@ -154,21 +162,15 @@ export default function Threads({
   const fetchConversations = async (threadId) => {
     setLoadingConversations((prev) => ({ ...prev, [threadId]: true }));
     try {
-      const response = await fetch(
-        `http://localhost:8000/architecture/threads/${threadId}/conversations`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-            'Content-Type': 'application/json',
-          },
-        }
+      const response = await axiosInstance.get(
+        `/architecture/threads/${threadId}/conversations`
       );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      // --- AXIOS CONVERSION START ---
+      // Axios throws an error for non-2xx statuses, replacing the manual '!response.ok' check.
+      // Axios returns the JSON response body directly in response.data.
+      const conversations = response.data;
 
-      const conversations = await response.json();
       const sortedConversations = conversations.sort(
         (a, b) => a.version - b.version
       );
@@ -184,8 +186,15 @@ export default function Threads({
           conversations: sortedConversations,
         })
       );
+      // --- AXIOS CONVERSION END ---
     } catch (err) {
-      console.error('Error fetching conversations:', err);
+      // This catch block handles both network errors and non-2xx HTTP status codes.
+      const status = err.response ? err.response.status : 'N/A';
+      const statusText = err.response
+        ? err.response.statusText
+        : 'Network Error';
+
+      console.error('Error fetching conversations:', status, statusText, err);
       showCustomMessageBox(
         'Load Error',
         'Failed to load conversation history.',
@@ -243,6 +252,7 @@ export default function Threads({
 
   const handleLoadVersion = useCallback(
     (thread, conversation) => {
+      console.log('conv', conversation);
       if (conversation.diagram_json && conversation.diagram_json.nodes) {
         const processedNodes = conversation.diagram_json.nodes.map((node) => {
           let nodeType = 'custom';
@@ -250,13 +260,23 @@ export default function Threads({
             ...node.data,
             onEdit: handleEditNode,
           };
-
-          if (diagramType === 'architecture') {
+          console.log('hellllllllllllo', diagramType);
+          if (
+            conversation.diagram_json.metadata.diagram_type === 'architecture'
+          ) {
             nodeType = node.data.image ? 'custom' : 'default';
             nodeData.image = processImagePath(node.data.image);
-          } else if (diagramType === 'db_diagram') {
+          } else if (
+            conversation.diagram_json.metadata.diagram_type === 'db_diagram'
+          ) {
             nodeType = 'dbTableNode';
           }
+          // if (diagramType === 'architecture') {
+          //   nodeType = node.data.image ? 'custom' : 'default';
+          //   nodeData.image = processImagePath(node.data.image);
+          // } else if (diagramType === 'db_diagram') {
+          //   nodeType = 'dbTableNode';
+          // }
 
           return {
             ...node,
