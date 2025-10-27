@@ -77,10 +77,10 @@ function FlowCanvas({
       let nodeType = 'custom';
       let nodeData = { ...node.data, onEdit: handleEditNode };
       console.log('diagramType', diagramType);
-      if (diagramType === 'architecture') {
+      if (data.metadata.diagram_type === 'architecture') {
         nodeType = node.data.image ? 'custom' : 'default';
         nodeData.image = processImagePath(node.data.image);
-      } else if (diagramType === 'db_diagram') {
+      } else if (data.metadata.diagram_type === 'db_diagram') {
         console.log('Creating DB node:', nodeType, node.data);
         nodeType = 'dbTableNode';
       }
