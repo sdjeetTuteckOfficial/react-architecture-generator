@@ -52,6 +52,7 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
     createThread,
     loadThread,
     analyzeProject,
+    modifyDiagram, // ✅ ADD THIS
     sendClarificationResponse,
   } = useArchitectureWebSocket({
     onDiagramGenerated: handleGenerateDiagram,
@@ -76,8 +77,15 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
     setInputValue('');
 
     if (awaitingClarification) {
+      // During clarification flow
       sendClarificationResponse(userMessage);
+    } else if (conversationHistory.length > 0) {
+      // ✅ If diagram exists, use modify
+      console.log('🔧 Modifying existing diagram');
+      modifyDiagram(userMessage);
     } else {
+      // ✅ If no diagram, use analyze to create first one
+      console.log('🎨 Creating first diagram');
       analyzeProject(userMessage);
     }
   };

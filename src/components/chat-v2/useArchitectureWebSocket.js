@@ -1,17 +1,15 @@
 // src/hooks/useArchitectureWebSocket.js
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { triggerThreadRefresh } from '../../redux/threadSlice';
 
-// WebSocket URL configuration
 const getWebSocketURL = () => {
   const isDev = import.meta.env.DEV;
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 
   if (isDev) {
-    // Development: Use localhost with explicit port
     return 'ws://localhost:8000';
   } else {
-    // Production: Use same host as current page
     const host = window.location.host;
     return `${protocol}//${host}`;
   }
@@ -27,7 +25,7 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
   const reconnectAttemptsRef = useRef(0);
   const isUnmountedRef = useRef(false);
   const maxReconnectAttempts = 5;
-
+  const dispatch = useDispatch();
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
@@ -71,6 +69,8 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
         case 'thread_created':
           setCurrentThreadId(data.thread_id);
           setCurrentVersion(0);
+          setConversationHistory([]); // Clear history for new thread
+          setMemoryContext(null);
           addMessage('bot', data.message);
           break;
 
@@ -92,6 +92,10 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
 
         case 'processing':
           setIsProcessing(true);
+          addMessage('bot', data.message);
+          break;
+
+        case 'info':
           addMessage('bot', data.message);
           break;
 
@@ -119,10 +123,24 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
           break;
 
         case 'diagram_generated':
+        case 'diagram_modified':
           setIsProcessing(false);
           setAwaitingClarification(false);
           setClarificationProgress(null);
           setCurrentVersion(data.version + 1);
+          dispatch(triggerThreadRefresh());
+          // Update conversation history
+          if (data.diagram) {
+            setConversationHistory((prev) => [
+              ...prev,
+              {
+                version: data.version,
+                diagram_json: data.diagram,
+                created_at: new Date().toISOString(),
+                conversation_id: `conv_${Date.now()}`,
+              },
+            ]);
+          }
 
           addMessage('bot', data.message);
 
@@ -132,9 +150,12 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
           }
 
           if (data.metadata) {
+            const isModification = data.metadata.is_modification
+              ? ' (Modified)'
+              : '';
             addMessage(
               'bot',
-              `📊 ${data.metadata.node_count} components, ${data.metadata.edge_count} connections`
+              `📊 ${data.metadata.node_count} components, ${data.metadata.edge_count} connections${isModification}`
             );
           }
           break;
@@ -145,7 +166,6 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
           break;
 
         case 'pong':
-          // Keep-alive response
           break;
 
         default:
@@ -169,7 +189,6 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
     }
 
     if (wsRef.current) {
-      // Remove event listeners before closing
       wsRef.current.onopen = null;
       wsRef.current.onmessage = null;
       wsRef.current.onerror = null;
@@ -191,7 +210,6 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
   }, []);
 
   const connect = useCallback(() => {
-    // Prevent connection if unmounted or already connecting/connected
     if (isUnmountedRef.current) {
       console.log('⚠️ Component unmounted, skipping connection');
       return;
@@ -216,7 +234,6 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
     }
 
     try {
-      // Close existing connection if any
       if (wsRef.current) {
         disconnect();
       }
@@ -232,7 +249,6 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
-      // Connection timeout
       const connectionTimeout = setTimeout(() => {
         if (ws.readyState !== WebSocket.OPEN && !isUnmountedRef.current) {
           console.error('❌ Connection timeout');
@@ -256,7 +272,6 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
         setConnectionError(null);
         reconnectAttemptsRef.current = 0;
 
-        // Authenticate
         if (token) {
           console.log('🔐 Authenticating...');
           ws.send(JSON.stringify({ type: 'auth', token }));
@@ -265,7 +280,6 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
           addMessage('system', '⚠️ Not authenticated');
         }
 
-        // Start ping interval
         pingIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'ping' }));
@@ -312,7 +326,6 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
           pingIntervalRef.current = null;
         }
 
-        // Attempt reconnection for non-clean closes
         if (
           event.code !== 1000 &&
           reconnectAttemptsRef.current < maxReconnectAttempts
@@ -408,6 +421,18 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
     [sendMessage, addMessage, diagramType]
   );
 
+  // ✅ NEW: Add modify function for diagram modifications
+  const modifyDiagram = useCallback(
+    (modification) => {
+      addMessage('user', modification);
+      return sendMessage({
+        type: 'modify',
+        modification,
+      });
+    },
+    [sendMessage, addMessage]
+  );
+
   const sendClarificationResponse = useCallback(
     (response) => {
       addMessage('user', response);
@@ -419,12 +444,10 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
     [sendMessage, addMessage]
   );
 
-  // Mount effect
   useEffect(() => {
     isUnmountedRef.current = false;
     console.log('🚀 Component mounted, connecting...');
 
-    // Small delay to prevent rapid reconnection
     const initTimeout = setTimeout(() => {
       if (!isUnmountedRef.current) {
         connect();
@@ -437,7 +460,7 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
       clearTimeout(initTimeout);
       disconnect();
     };
-  }, []); // Empty deps - only run on mount/unmount
+  }, []);
 
   return {
     isConnected,
@@ -456,6 +479,7 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
     createThread,
     loadThread,
     analyzeProject,
+    modifyDiagram, // ✅ Export the new function
     sendClarificationResponse,
     addMessage,
   };
