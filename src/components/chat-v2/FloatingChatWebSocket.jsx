@@ -1,4 +1,3 @@
-// src/components/FloatingChatWebSocket.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { setDiagramType } from '../../redux/diagramSlice';
@@ -12,12 +11,13 @@ import {
   AlertCircle,
   Sparkles,
   Zap,
-  History,
   Plus,
   Wifi,
   WifiOff,
   Database,
   Brain,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import useArchitectureWebSocket from './useArchitectureWebSocket';
 
@@ -30,8 +30,8 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
 
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
-  const [showThreads, setShowThreads] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
+  const [isDark, setIsDark] = useState(false);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -52,7 +52,7 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
     createThread,
     loadThread,
     analyzeProject,
-    modifyDiagram, // ✅ ADD THIS
+    modifyDiagram,
     sendClarificationResponse,
   } = useArchitectureWebSocket({
     onDiagramGenerated: handleGenerateDiagram,
@@ -77,14 +77,11 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
     setInputValue('');
 
     if (awaitingClarification) {
-      // During clarification flow
       sendClarificationResponse(userMessage);
     } else if (conversationHistory.length > 0) {
-      // ✅ If diagram exists, use modify
       console.log('🔧 Modifying existing diagram');
       modifyDiagram(userMessage);
     } else {
-      // ✅ If no diagram, use analyze to create first one
       console.log('🎨 Creating first diagram');
       analyzeProject(userMessage);
     }
@@ -99,49 +96,88 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
       diagramType === 'architecture' ? 'Architecture' : 'Database'
     } Chat ${new Date().toLocaleString()}`;
     createThread(threadName);
-    setShowThreads(false);
   };
 
   return (
     <>
       {/* Floating Button */}
-      <div className='fixed bottom-6 right-6 z-50'>
+      <div className='fixed bottom-8 right-8 z-50'>
         <div
-          className={`relative transition-all duration-500 ${
+          className={`relative transition-all duration-700 ease-out ${
             isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'
           }`}
         >
-          <div className='absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 animate-ping opacity-20'></div>
+          <div
+            className={`absolute inset-0 rounded-full blur-xl opacity-60 animate-pulse ${
+              isDark
+                ? 'bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600'
+                : 'bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600'
+            }`}
+          ></div>
           <button
             onClick={() => setIsOpen(true)}
-            className='relative bg-gradient-to-r from-blue-600 via-purple-600 to-blue-700 hover:from-blue-700 hover:via-purple-700 hover:to-blue-800 text-white rounded-full p-4 shadow-2xl transition-all duration-300 hover:scale-110 group'
+            className={`relative rounded-full p-5 shadow-2xl transition-all duration-500 hover:scale-110 border group overflow-hidden ${
+              isDark
+                ? 'bg-gradient-to-br from-slate-900 to-slate-800 border-slate-700/50'
+                : 'bg-gradient-to-br from-cyan-500 via-blue-500 to-indigo-600 border-blue-400/50'
+            }`}
           >
+            <div
+              className={`absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${
+                isDark
+                  ? 'from-cyan-500/20 to-purple-500/20'
+                  : 'from-white/20 to-transparent'
+              }`}
+            ></div>
             <MessageCircle
               size={28}
-              className='group-hover:rotate-12 transition-transform duration-300'
+              className='relative z-10 group-hover:rotate-12 transition-transform duration-500 text-white'
             />
-            <Sparkles className='absolute -top-1 -right-1 w-4 h-4 text-yellow-300 animate-bounce' />
+            <Sparkles
+              className={`absolute -top-1 -right-1 w-4 h-4 animate-pulse ${
+                isDark ? 'text-cyan-400' : 'text-yellow-300'
+              }`}
+            />
           </button>
         </div>
       </div>
 
       {/* Chat Window */}
       {isOpen && (
-        <div className='fixed bottom-6 right-6 z-50 w-[420px] h-[90vh] backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 rounded-2xl shadow-2xl border border-white/20 flex flex-col overflow-hidden'>
-          {/* Header */}
-          <div className='relative bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 text-white p-5 rounded-t-2xl'>
-            <div className='absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 opacity-90'></div>
+        <div
+          className={`fixed bottom-8 right-8 z-50 w-[440px] h-[85vh] backdrop-blur-2xl ${
+            isDark
+              ? 'bg-slate-900/95 border-slate-700/50'
+              : 'bg-white/95 border-gray-200'
+          } rounded-3xl shadow-2xl border flex flex-col overflow-hidden transition-colors duration-300`}
+        >
+          {/* Ambient Glow */}
+          <div
+            className={`absolute inset-0 bg-gradient-to-br ${
+              isDark
+                ? 'from-cyan-500/5 via-transparent to-purple-500/5'
+                : 'from-cyan-500/3 via-transparent to-purple-500/3'
+            } pointer-events-none`}
+          ></div>
 
-            <div className='relative flex items-center justify-between'>
-              <div className='flex items-center space-x-3'>
+          {/* Header */}
+          <div
+            className={`relative p-6 border-b ${
+              isDark ? 'border-slate-800/50' : 'border-gray-200'
+            }`}
+          >
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center space-x-4'>
                 <div className='relative'>
-                  <div className='w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm'>
+                  <div className='w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/50'>
                     <Bot size={24} className='text-white' />
                   </div>
                   <div
-                    className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
+                    className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 ${
+                      isDark ? 'border-slate-900' : 'border-white'
+                    } ${
                       isConnected
-                        ? 'bg-green-400 animate-pulse'
+                        ? 'bg-emerald-400'
                         : isConnecting
                         ? 'bg-yellow-400 animate-spin'
                         : 'bg-red-400'
@@ -149,16 +185,21 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
                   ></div>
                 </div>
                 <div>
-                  <h3 className='font-bold text-lg flex items-center gap-2'>
+                  <h3
+                    className={`font-semibold text-lg ${
+                      isDark ? 'text-white' : 'text-gray-900'
+                    } flex items-center gap-2`}
+                  >
                     AI Architect
                     {memoryContext && (
-                      <Brain
-                        size={16}
-                        className='text-yellow-300 animate-pulse'
-                      />
+                      <Brain size={16} className='text-cyan-400' />
                     )}
                   </h3>
-                  <p className='text-sm text-white/80 flex items-center gap-1'>
+                  <p
+                    className={`text-sm ${
+                      isDark ? 'text-slate-400' : 'text-gray-600'
+                    } flex items-center gap-2`}
+                  >
                     {isConnected ? (
                       <>
                         <Wifi size={12} />
@@ -174,42 +215,81 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
                     ) : (
                       <>
                         <WifiOff size={12} />
-                        Disconnected
+                        Offline
                       </>
                     )}
                   </p>
                 </div>
               </div>
               <div className='flex items-center space-x-2'>
+                <button
+                  onClick={() => setIsDark(!isDark)}
+                  className={`w-10 h-10 ${
+                    isDark
+                      ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50'
+                      : 'bg-gray-100 border-gray-200 hover:bg-gray-200'
+                  } rounded-xl backdrop-blur-sm transition-all flex items-center justify-center group border`}
+                >
+                  {isDark ? (
+                    <Sun
+                      size={18}
+                      className='text-slate-400 group-hover:text-yellow-400 transition-colors'
+                    />
+                  ) : (
+                    <Moon
+                      size={18}
+                      className='text-gray-600 group-hover:text-blue-600 transition-colors'
+                    />
+                  )}
+                </button>
                 {memoryContext && (
                   <button
                     onClick={() => setShowMemory(!showMemory)}
-                    className='w-8 h-8 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-all flex items-center justify-center group relative'
+                    className={`w-10 h-10 ${
+                      isDark
+                        ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50'
+                        : 'bg-gray-100 border-gray-200 hover:bg-gray-200'
+                    } rounded-xl backdrop-blur-sm transition-all flex items-center justify-center group relative border`}
                   >
-                    <Brain size={16} className='text-white' />
-                    <span className='absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 text-xs flex items-center justify-center rounded-full text-gray-900 font-bold'>
+                    <Brain
+                      size={18}
+                      className={`${
+                        isDark
+                          ? 'text-slate-400 group-hover:text-cyan-400'
+                          : 'text-gray-600 group-hover:text-cyan-600'
+                      } transition-colors`}
+                    />
+                    <span className='absolute -top-1 -right-1 w-5 h-5 bg-cyan-400 text-xs flex items-center justify-center rounded-full text-slate-900 font-bold'>
                       {memoryContext.previous_versions}
                     </span>
                   </button>
                 )}
                 <button
-                  onClick={() => setShowThreads(!showThreads)}
-                  className='w-8 h-8 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-all flex items-center justify-center'
-                >
-                  <History size={16} className='text-white' />
-                </button>
-                <button
                   onClick={handleNewChat}
                   disabled={!isConnected}
-                  className='w-8 h-8 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-all flex items-center justify-center disabled:opacity-50'
+                  className={`w-10 h-10 ${
+                    isDark
+                      ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50'
+                      : 'bg-gray-100 border-gray-200 hover:bg-gray-200'
+                  } rounded-xl backdrop-blur-sm transition-all flex items-center justify-center border disabled:opacity-50`}
                 >
-                  <Plus size={16} className='text-white' />
+                  <Plus
+                    size={18}
+                    className={isDark ? 'text-slate-400' : 'text-gray-600'}
+                  />
                 </button>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className='w-8 h-8 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-all flex items-center justify-center'
+                  className={`w-10 h-10 ${
+                    isDark
+                      ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50'
+                      : 'bg-gray-100 border-gray-200 hover:bg-gray-200'
+                  } rounded-xl backdrop-blur-sm transition-all flex items-center justify-center border`}
                 >
-                  <X size={18} className='text-white' />
+                  <X
+                    size={18}
+                    className={isDark ? 'text-slate-400' : 'text-gray-600'}
+                  />
                 </button>
               </div>
             </div>
@@ -217,44 +297,84 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
 
           {/* Memory Panel */}
           {showMemory && memoryContext && (
-            <div className='bg-gradient-to-b from-yellow-50 to-white border-b border-yellow-200 p-4'>
-              <div className='flex items-center justify-between mb-3'>
-                <h4 className='font-semibold text-gray-800 flex items-center gap-2'>
-                  <Brain size={16} className='text-yellow-600' />
+            <div
+              className={`${
+                isDark
+                  ? 'bg-slate-800/30 border-slate-700/50'
+                  : 'bg-gray-50 border-gray-200'
+              } border-b p-5 backdrop-blur-sm`}
+            >
+              <div className='flex items-center justify-between mb-4'>
+                <h4
+                  className={`font-medium ${
+                    isDark ? 'text-white' : 'text-gray-900'
+                  } flex items-center gap-2`}
+                >
+                  <Brain size={16} className='text-cyan-400' />
                   Memory Context
                 </h4>
                 <button
                   onClick={() => setShowMemory(false)}
-                  className='text-gray-500 hover:text-gray-700'
+                  className={`${
+                    isDark
+                      ? 'text-slate-400 hover:text-white'
+                      : 'text-gray-600 hover:text-gray-900'
+                  } transition-colors`}
                 >
                   <X size={16} />
                 </button>
               </div>
-              <div className='space-y-2 text-sm'>
-                <div className='flex items-center justify-between bg-white rounded-lg p-2 border'>
-                  <span className='text-gray-600'>Versions:</span>
-                  <span className='font-bold text-yellow-700'>
+              <div className='space-y-3 text-sm'>
+                <div
+                  className={`flex items-center justify-between ${
+                    isDark
+                      ? 'bg-slate-800/50 border-slate-700/50'
+                      : 'bg-white border-gray-200'
+                  } rounded-xl p-3 border`}
+                >
+                  <span className={isDark ? 'text-slate-400' : 'text-gray-600'}>
+                    Versions
+                  </span>
+                  <span className='font-semibold text-cyan-400'>
                     {memoryContext.previous_versions}
                   </span>
                 </div>
-                <div className='flex items-center justify-between bg-white rounded-lg p-2 border'>
-                  <span className='text-gray-600'>Components:</span>
-                  <span className='font-bold text-yellow-700'>
+                <div
+                  className={`flex items-center justify-between ${
+                    isDark
+                      ? 'bg-slate-800/50 border-slate-700/50'
+                      : 'bg-white border-gray-200'
+                  } rounded-xl p-3 border`}
+                >
+                  <span className={isDark ? 'text-slate-400' : 'text-gray-600'}>
+                    Components
+                  </span>
+                  <span className='font-semibold text-cyan-400'>
                     {memoryContext.total_components}
                   </span>
                 </div>
                 {memoryContext.technologies_used?.length > 0 && (
-                  <div className='bg-white rounded-lg p-2 border'>
-                    <span className='text-gray-600 block mb-1'>
-                      Technologies:
+                  <div
+                    className={`${
+                      isDark
+                        ? 'bg-slate-800/50 border-slate-700/50'
+                        : 'bg-white border-gray-200'
+                    } rounded-xl p-3 border`}
+                  >
+                    <span
+                      className={`${
+                        isDark ? 'text-slate-400' : 'text-gray-600'
+                      } block mb-2`}
+                    >
+                      Technologies
                     </span>
-                    <div className='flex flex-wrap gap-1'>
+                    <div className='flex flex-wrap gap-2'>
                       {memoryContext.technologies_used
                         .slice(0, 8)
                         .map((tech, idx) => (
                           <span
                             key={idx}
-                            className='text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full'
+                            className='text-xs bg-cyan-400/10 text-cyan-400 px-3 py-1 rounded-full border border-cyan-400/20'
                           >
                             {tech}
                           </span>
@@ -266,80 +386,45 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
             </div>
           )}
 
-          {/* Thread History */}
-          {showThreads && (
-            <div className='bg-gradient-to-b from-gray-50 to-white border-b border-gray-200 max-h-48 overflow-y-auto'>
-              <div className='p-4'>
-                <div className='flex items-center justify-between mb-3'>
-                  <h4 className='font-semibold text-gray-800 flex items-center gap-2'>
-                    <History size={16} />
-                    History
-                  </h4>
-                  <button
-                    onClick={() => setShowThreads(false)}
-                    className='text-gray-500'
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-                {conversationHistory.length > 0 ? (
-                  <div className='space-y-2'>
-                    {conversationHistory.map((conv) => (
-                      <div
-                        key={conv.conversation_id}
-                        className='bg-white border rounded-lg p-3'
-                      >
-                        <div className='flex items-center justify-between mb-1'>
-                          <span className='text-sm font-medium'>
-                            Version {conv.version}
-                          </span>
-                          <Database size={14} className='text-blue-600' />
-                        </div>
-                        <div className='text-xs text-gray-500'>
-                          {new Date(conv.created_at).toLocaleString()}
-                        </div>
-                        <div className='text-xs text-blue-600 mt-1'>
-                          {conv.diagram_json?.nodes?.length || 0} components
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className='text-gray-500 text-sm text-center py-4'>
-                    No history
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Mode Selector */}
-          <div className='p-4 bg-gradient-to-r from-gray-50 to-blue-50/50 border-b'>
+          <div
+            className={`p-5 border-b ${
+              isDark ? 'border-slate-800/50' : 'border-gray-200'
+            }`}
+          >
             <div className='flex items-center justify-between'>
-              <div className='flex space-x-2'>
+              <div className='flex space-x-3'>
                 <button
                   onClick={() => handleDiagramTypeChange('architecture')}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 ${
                     diagramType === 'architecture'
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg scale-105'
-                      : 'bg-white/80 text-gray-700 border hover:scale-105'
+                      ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/50'
+                      : isDark
+                      ? 'bg-slate-800/50 text-slate-400 border border-slate-700/50 hover:text-white'
+                      : 'bg-gray-100 text-gray-600 border border-gray-200 hover:text-gray-900'
                   }`}
                 >
                   🏗️ Architecture
                 </button>
                 <button
                   onClick={() => handleDiagramTypeChange('db_diagram')}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 ${
                     diagramType === 'db_diagram'
-                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg scale-105'
-                      : 'bg-white/80 text-gray-700 border hover:scale-105'
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/50'
+                      : isDark
+                      ? 'bg-slate-800/50 text-slate-400 border border-slate-700/50 hover:text-white'
+                      : 'bg-gray-100 text-gray-600 border border-gray-200 hover:text-gray-900'
                   }`}
                 >
                   🗄️ Database
                 </button>
               </div>
               {currentThreadId && (
-                <div className='text-xs text-gray-600 flex items-center gap-1'>
+                <div
+                  className={`text-xs ${
+                    isDark ? 'text-slate-500' : 'text-gray-500'
+                  } flex items-center gap-1.5`}
+                >
                   <Database size={12} />v{currentVersion}
                 </div>
               )}
@@ -347,8 +432,8 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
           </div>
 
           {/* Messages */}
-          <div className='flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-transparent to-gray-50/30'>
-            {messages.map((message, index) => (
+          <div className='flex-1 overflow-y-auto p-6 space-y-6'>
+            {messages.map((message) => (
               <div
                 key={message.id}
                 className={`flex ${
@@ -363,44 +448,50 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
                   }`}
                 >
                   <div
-                    className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg ${
+                    className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${
                       message.type === 'user'
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
+                        ? 'bg-gradient-to-br from-cyan-400 to-blue-500 shadow-lg shadow-cyan-500/50'
                         : message.isError
-                        ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white'
+                        ? 'bg-gradient-to-r from-red-500 to-pink-500'
                         : message.type === 'system'
-                        ? 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
-                        : 'bg-gradient-to-r from-gray-100 to-white text-gray-700 border'
+                        ? 'bg-gradient-to-r from-gray-400 to-gray-500'
+                        : isDark
+                        ? 'bg-slate-800/50 border border-slate-700/50'
+                        : 'bg-gray-100 border border-gray-200'
                     }`}
                   >
                     {message.type === 'user' ? (
-                      <User size={18} />
+                      <User size={18} className='text-white' />
                     ) : message.isError ? (
-                      <AlertCircle size={18} />
+                      <AlertCircle size={18} className='text-white' />
                     ) : message.type === 'system' ? (
-                      <Zap size={18} />
+                      <Zap size={18} className='text-white' />
                     ) : (
-                      <Bot size={18} />
+                      <Bot size={18} className='text-cyan-400' />
                     )}
                   </div>
                   <div
-                    className={`p-4 rounded-2xl shadow-sm backdrop-blur-sm ${
+                    className={`p-4 rounded-2xl backdrop-blur-sm ${
                       message.type === 'user'
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
+                        ? 'bg-gradient-to-br from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/20'
                         : message.isError
                         ? 'bg-gradient-to-r from-red-50 to-pink-50 text-red-800 border border-red-200'
                         : message.type === 'system'
                         ? 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 border'
-                        : 'bg-white/80 text-gray-800 border'
+                        : isDark
+                        ? 'bg-slate-800/50 text-slate-200 border border-slate-700/50'
+                        : 'bg-gray-50 text-gray-800 border border-gray-200'
                     }`}
                   >
-                    <p className='text-sm whitespace-pre-wrap leading-relaxed'>
+                    <p className='text-sm leading-relaxed whitespace-pre-wrap'>
                       {message.content}
                     </p>
                     <p
                       className={`text-xs mt-2 ${
                         message.type === 'user'
-                          ? 'text-white/70'
+                          ? 'text-cyan-100'
+                          : isDark
+                          ? 'text-slate-500'
                           : 'text-gray-500'
                       }`}
                     >
@@ -417,23 +508,41 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
             {isProcessing && (
               <div className='flex justify-start'>
                 <div className='flex items-center space-x-3'>
-                  <div className='w-10 h-10 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 text-white flex items-center justify-center shadow-lg'>
-                    <Loader2 size={18} className='animate-spin' />
+                  <div
+                    className={`w-10 h-10 rounded-2xl ${
+                      isDark
+                        ? 'bg-slate-800/50 border-slate-700/50'
+                        : 'bg-gray-100 border-gray-200'
+                    } border flex items-center justify-center`}
+                  >
+                    <Loader2 size={18} className='animate-spin text-cyan-400' />
                   </div>
-                  <div className='bg-white p-4 rounded-2xl shadow-sm border'>
+                  <div
+                    className={`${
+                      isDark
+                        ? 'bg-slate-800/50 border-slate-700/50'
+                        : 'bg-gray-50 border-gray-200'
+                    } p-4 rounded-2xl border`}
+                  >
                     <div className='flex items-center space-x-2'>
                       <div className='flex space-x-1'>
-                        <div className='w-2 h-2 bg-blue-500 rounded-full animate-bounce'></div>
+                        <div className='w-2 h-2 bg-cyan-400 rounded-full animate-bounce'></div>
                         <div
-                          className='w-2 h-2 bg-purple-500 rounded-full animate-bounce'
-                          style={{ animationDelay: '0.1s' }}
+                          className='w-2 h-2 bg-blue-400 rounded-full animate-bounce'
+                          style={{ animationDelay: '0.15s' }}
                         ></div>
                         <div
-                          className='w-2 h-2 bg-indigo-500 rounded-full animate-bounce'
-                          style={{ animationDelay: '0.2s' }}
+                          className='w-2 h-2 bg-purple-400 rounded-full animate-bounce'
+                          style={{ animationDelay: '0.3s' }}
                         ></div>
                       </div>
-                      <span className='text-sm'>AI thinking...</span>
+                      <span
+                        className={`text-sm ${
+                          isDark ? 'text-slate-400' : 'text-gray-600'
+                        }`}
+                      >
+                        AI thinking...
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -462,7 +571,11 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
           </div>
 
           {/* Input Area */}
-          <div className='p-4 bg-gradient-to-r from-white/50 to-gray-50/50 backdrop-blur-sm border-t'>
+          <div
+            className={`p-6 border-t ${
+              isDark ? 'border-slate-800/50' : 'border-gray-200'
+            }`}
+          >
             <div className='flex space-x-3'>
               <input
                 ref={inputRef}
@@ -484,20 +597,24 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
                     ? '💬 Continue or update...'
                     : '✨ Describe your project...'
                 }
-                className='flex-1 border-2 rounded-2xl px-4 py-3 text-sm bg-white/80 focus:outline-none focus:ring-4 focus:ring-blue-500/20 disabled:opacity-50'
+                className={`flex-1 border ${
+                  isDark
+                    ? 'border-slate-700/50 bg-slate-800/50 text-white placeholder-slate-500 focus:ring-cyan-500/50'
+                    : 'border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:ring-cyan-500/30'
+                } rounded-2xl px-5 py-3.5 text-sm focus:outline-none focus:ring-2 disabled:opacity-50 transition-all`}
                 disabled={isProcessing || !isConnected}
               />
               <button
                 onClick={handleSubmit}
                 disabled={!inputValue.trim() || isProcessing || !isConnected}
-                className='bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-2xl p-3 shadow-lg disabled:opacity-50 transition-all hover:scale-105 disabled:hover:scale-100 group'
+                className='bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-2xl px-5 py-3.5 shadow-lg shadow-cyan-500/30 disabled:opacity-50 transition-all hover:scale-105 disabled:hover:scale-100 group'
               >
                 {isProcessing ? (
                   <Loader2 size={20} className='animate-spin' />
                 ) : (
                   <Send
                     size={20}
-                    className='group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform'
+                    className='group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform'
                   />
                 )}
               </button>
@@ -505,7 +622,7 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
 
             {awaitingClarification && clarificationProgress && (
               <div className='mt-3 flex items-center justify-between text-xs'>
-                <span className='text-gray-500'>
+                <span className={isDark ? 'text-slate-500' : 'text-gray-500'}>
                   Question {clarificationProgress.current} of{' '}
                   {clarificationProgress.total}
                 </span>
@@ -529,19 +646,27 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
               </div>
             )}
 
-            <div className='mt-2 flex items-center justify-between text-xs text-gray-500'>
-              <span className='flex items-center gap-1'>
+            <div className='mt-4 flex items-center justify-between text-xs'>
+              <span
+                className={`${
+                  isDark ? 'text-slate-500' : 'text-gray-500'
+                } flex items-center gap-2`}
+              >
                 {currentThreadId ? (
                   <>💾 Thread (v{currentVersion})</>
                 ) : (
                   <>📝 No thread</>
                 )}
               </span>
-              <span className='flex items-center gap-1'>
+              <span
+                className={`${
+                  isDark ? 'text-slate-500' : 'text-gray-500'
+                } flex items-center gap-2`}
+              >
                 {isConnected ? (
                   <>
-                    <Wifi size={12} className='text-green-600' />
-                    <span className='text-green-600'>Connected</span>
+                    <Wifi size={12} className='text-emerald-400' />
+                    <span className='text-emerald-400'>Connected</span>
                   </>
                 ) : isConnecting ? (
                   <>
@@ -553,15 +678,23 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
                   </>
                 ) : (
                   <>
-                    <WifiOff size={12} className='text-red-600' />
-                    <span className='text-red-600'>Disconnected</span>
+                    <WifiOff size={12} className='text-red-400' />
+                    <span className='text-red-400'>Disconnected</span>
                   </>
                 )}
               </span>
             </div>
 
             {currentThreadId && !awaitingClarification && memoryContext && (
-              <div className='mt-2 text-xs text-blue-600 bg-blue-50 rounded-lg p-2'>
+              <div
+                className={`mt-3 text-xs ${
+                  isDark
+                    ? 'text-cyan-400 bg-cyan-400/10'
+                    : 'text-blue-600 bg-blue-50'
+                } rounded-lg p-3 border ${
+                  isDark ? 'border-cyan-400/20' : 'border-blue-200'
+                }`}
+              >
                 🧠 Memory active with {memoryContext.previous_versions}{' '}
                 versions!
                 <br />
