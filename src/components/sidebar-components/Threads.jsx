@@ -366,13 +366,13 @@ export default function Threads({
       {/* Header */}
       <div className='flex items-center justify-between mb-2 flex-shrink-0'>
         <h3 className='text-sm font-medium text-gray-700'>Conversations</h3>
-        <button
+        {/* <button
           className='p-1 hover:bg-gray-100 rounded transition-colors'
           title='Create new thread'
           onClick={() => fetchThreads(0)}
         >
           <Plus size={14} className='text-gray-500' />
-        </button>
+        </button> */}
       </div>
 
       {/* Content */}
