@@ -1,5 +1,6 @@
 import { Code2, Database, LayoutDashboard, Zap, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
 function HomePage() {
   const navigate = useNavigate();
   const navigateToChatbot = () => {
@@ -14,9 +15,9 @@ function HomePage() {
   };
 
   const handleLogout = () => {
-    console.log('Logout clicked');
-    // In your actual app: handle logout logic
-    // navigate('/login')
+    console.log('User logged out!');
+    localStorage.clear();
+    navigate('/login');
   };
 
   return (
@@ -30,7 +31,7 @@ function HomePage() {
 
       {/* Logout Button */}
       <button
-        onClick={handleLogout}
+        onClick={() => handleLogout()}
         className='absolute top-4 right-4 z-20 flex items-center gap-2 px-4 py-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-lg shadow-lg border border-gray-200/50 dark:border-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-800 transition-all duration-300 group'
       >
         <LogOut className='w-4 h-4 group-hover:rotate-12 transition-transform duration-300' />
