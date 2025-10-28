@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Shield, ArrowRight, RefreshCw, Mail, Clock } from 'lucide-react';
-import axios from 'axios';
+import axiosInstance from '../security/axios-instance';
 import { useNavigate } from 'react-router-dom';
 
 const OtpPage = () => {
@@ -91,13 +91,10 @@ const OtpPage = () => {
     try {
       // Simulate API call
       const user = JSON.parse(localStorage.getItem('unregistered-user'));
-      const response = await axios.post(
-        'http://127.0.0.1:8000/auth/verify-otp',
-        {
-          email: user.email,
-          otp: otpString,
-        }
-      );
+      const response = await axiosInstance.post('/auth/verify-otp', {
+        email: user.email,
+        otp: otpString,
+      });
 
       console.log('res', response);
 

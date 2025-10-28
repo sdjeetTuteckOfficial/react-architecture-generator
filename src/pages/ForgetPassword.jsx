@@ -69,69 +69,6 @@ const PasswordResetStepper = () => {
     }
     setCurrentStep(2);
   };
-  // const handleStep1Submit = (e) => {
-  //   e.preventDefault();
-  //   if (!formData.newPassword) {
-  //     setError('Please enter a new password.');
-  //     return;
-  //   }
-  //   if (!validatePassword(formData.newPassword)) {
-  //     setError('Password must be at least 8 characters long.');
-  //     return;
-  //   }
-  //   if (formData.newPassword !== formData.confirmPassword) {
-  //     setError('Passwords do not match.');
-  //     return;
-  //   }
-  //   setCurrentStep(2);
-  // };
-
-  // Step 2: Email
-  // const handleStep2Submit = async (e) => {
-  //   e.preventDefault();
-  //   if (!formData.email) {
-  //     setError('Please enter your email address.');
-  //     return;
-  //   }
-  //   if (!validateEmail(formData.email)) {
-  //     setError('Please enter a valid email address.');
-  //     return;
-  //   }
-
-  //   setIsLoading(true);
-  //   setError('');
-
-  //   try {
-  //     const response = await fetch(
-  //       'http://localhost:8000/auth/forgot-password',
-  //       {
-  //         method: 'POST',
-  //         headers: { 'Content-Type': 'application/json' },
-  //         body: JSON.stringify({ email: formData.email }),
-  //       }
-  //     );
-
-  //     if (!response.ok) throw new Error('Network error');
-
-  //     const data = await response.json();
-
-  //     if (data.message) {
-  //       setSuccessMessage(
-  //         data.otp ? `${data.message}. OTP: ${data.otp}` : data.message
-  //       );
-  //       setTimeout(() => {
-  //         setCurrentStep(3);
-  //         setSuccessMessage('');
-  //       }, 2000);
-  //     } else {
-  //       setError('Unexpected response from server.');
-  //     }
-  //   } catch (err) {
-  //     setError('Failed to send reset request. Please try again.');
-  //   } finally {
-  //     setIsLoading(false);
-  //   }
-  // };
 
   const handleStep2Submit = async (e) => {
     e.preventDefault();
@@ -178,52 +115,6 @@ const PasswordResetStepper = () => {
       setIsLoading(false);
     }
   };
-
-  // Step 3: OTP Verification
-  // const handleStep3Submit = async (e) => {
-  //   e.preventDefault();
-  //   if (!formData.otp) {
-  //     setError('Please enter the OTP.');
-  //     return;
-  //   }
-  //   if (formData.otp.length !== 6) {
-  //     setError('OTP must be 6 digits.');
-  //     return;
-  //   }
-
-  //   setIsLoading(true);
-  //   setError('');
-
-  //   try {
-  //     const response = await fetch(
-  //       'http://localhost:8000/auth/reset-password',
-  //       {
-  //         method: 'POST',
-  //         headers: { 'Content-Type': 'application/json' },
-  //         body: JSON.stringify({
-  //           email: formData.email,
-  //           otp: formData.otp,
-  //           new_password: formData.newPassword,
-  //         }),
-  //       }
-  //     );
-
-  //     if (!response.ok) throw new Error('Failed to reset password');
-
-  //     const data = await response.json();
-
-  //     if (data.message) {
-  //       setSuccessMessage('Password reset successfully!');
-  //       setTimeout(() => setCurrentStep(4), 1500);
-  //     } else {
-  //       setError('Failed to reset password. Please try again.');
-  //     }
-  //   } catch (err) {
-  //     setError('Failed to reset password. Please try again.');
-  //   } finally {
-  //     setIsLoading(false);
-  //   }
-  // };
 
   const handleStep3Submit = async (e) => {
     e.preventDefault();

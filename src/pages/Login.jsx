@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, User } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import gunevoLogo from '/public/images/gunevo.svg';
-import axios from 'axios';
+import axiosInstance from '../security/axios-instance';
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -29,7 +29,7 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await axios.post('http://127.0.0.1:8000/auth/signin', {
+      const response = await axiosInstance.post('/auth/signin', {
         email: formData.email,
         password: formData.password,
       });

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, User } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import axiosInstance from '../security/axios-instance';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import gunevoLogo from '/public/images/gunevo.svg';
@@ -58,10 +58,7 @@ const SignUp = () => {
 
     try {
       // Axios POST request to the specified endpoint
-      const response = await axios.post(
-        'http://127.0.0.1:8000/auth/signup',
-        new_data
-      );
+      const response = await axiosInstance.post('/auth/signup', new_data);
 
       console.log('Registration successful!', response.data);
       localStorage.setItem('unregistered-user', JSON.stringify(response.data));

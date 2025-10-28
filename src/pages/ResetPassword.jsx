@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, ArrowRight, Lock, Shield } from 'lucide-react';
+import axiosInstance from '../security/axios-instance';
 
 const ResetPassword = () => {
   const [formData, setFormData] = useState({
@@ -32,35 +33,28 @@ const ResetPassword = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/auth/reset-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          otp: formData.otp,
-          new_password: formData.newPassword,
-        }),
+      const response = await axiosInstance.post('/auth/reset-password', {
+        email: formData.email,
+        otp: formData.otp,
+        new_password: formData.newPassword,
       });
 
-      const data = await response.json();
+      setSuccessMessage(
+        response.data.message || 'Password reset successfully!'
+      );
+      setFormData({ email: '', otp: '', newPassword: '' });
 
-      if (response.ok) {
-        setSuccessMessage(data.message || 'Password reset successfully!');
-        setFormData({ email: '', otp: '', newPassword: '' });
-        
-        // Redirect back to login after short delay
-        setTimeout(() => {
-          // In a real app, use navigate("/login") from react-router-dom
-          window.location.href = '/login';
-        }, 2000);
-      } else {
-        setError(data.message || 'Something went wrong');
-      }
+      // Redirect after success
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 2000);
     } catch (err) {
       console.error('Reset password error:', err);
-      setError('Failed to reset password. Please try again later.');
+      if (err.response && err.response.data && err.response.data.message) {
+        setError(err.response.data.message);
+      } else {
+        setError('Failed to reset password. Please try again later.');
+      }
     } finally {
       setIsLoading(false);
     }
