@@ -286,7 +286,7 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
           }
         }, 30000);
 
-        addMessage('system', '✨ Connected to AI Architect!');
+        addMessage('system', '✨ Connected to Gunevo ArchitectX!');
       };
 
       ws.onmessage = (event) => {

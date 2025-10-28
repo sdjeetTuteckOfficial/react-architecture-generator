@@ -190,7 +190,7 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
                       isDark ? 'text-white' : 'text-gray-900'
                     } flex items-center gap-2`}
                   >
-                    AI Architect
+                    Gunevo ArchitectX
                     {memoryContext && (
                       <Brain size={16} className='text-cyan-400' />
                     )}
