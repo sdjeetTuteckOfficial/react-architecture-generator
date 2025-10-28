@@ -331,15 +331,31 @@ export default function Threads({
   );
 
   const formatDate = (dateString) => {
+    if (!dateString) return '—';
+
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '—';
+
     const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    // Normalize both to midnight in local time (removes time & TZ issues)
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const target = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    );
+
+    const diffDays = Math.floor(
+      (today.getTime() - target.getTime()) / (1000 * 60 * 60 * 24)
+    );
 
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString('en-US', {
+
+    // Only show month + day (e.g. "Oct 28")
+    return target.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
     });
