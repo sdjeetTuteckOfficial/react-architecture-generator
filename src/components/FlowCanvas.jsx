@@ -7,13 +7,13 @@ import ReactFlow, {
   useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-
 import { useSelector, useDispatch } from 'react-redux';
 import DbTableEditor from './DbTableEditor';
 import EditModal from '../components/EditModal';
-import ChatInput from '../components/ChatInput';
+// import ChatInput from '../components/ChatInput';
 import JamboardToolbar from './Toolbar';
 import { fetchDiagramJSON } from '../api/gemini';
+import { domToPng } from 'modern-screenshot';
 
 // Import constants and utilities
 import {
@@ -52,6 +52,194 @@ function FlowCanvas({
   setLoading,
 }) {
   const { fitView, project, getViewport, toObject } = useReactFlow();
+
+  const handleScreenshot = useCallback(async () => {
+    try {
+      const flowElement = document.querySelector('.react-flow');
+
+      if (!flowElement) {
+        alert('Unable to find diagram');
+        return;
+      }
+
+      // Hide UI elements
+      const minimap = document.querySelector('.react-flow__minimap');
+      const controls = document.querySelector('.react-flow__controls');
+      const toolbar = document.querySelector('.absolute.top-4.left-4');
+
+      const elementsToHide = [minimap, controls, toolbar].filter(Boolean);
+      const originalDisplays = elementsToHide.map((el) => el.style.display);
+      elementsToHide.forEach((el) => (el.style.display = 'none'));
+
+      // CRITICAL: Fix all elements with oklch colors and text issues
+      const allElements = flowElement.querySelectorAll('*');
+      const originalStyles = [];
+
+      allElements.forEach((el, index) => {
+        const computedStyle = window.getComputedStyle(el);
+
+        originalStyles[index] = {
+          element: el,
+          color: el.style.color,
+          backgroundColor: el.style.backgroundColor,
+          borderColor: el.style.borderColor,
+          display: el.style.display,
+          WebkitLineClamp: el.style.WebkitLineClamp,
+          WebkitBoxOrient: el.style.WebkitBoxOrient,
+          whiteSpace: el.style.whiteSpace,
+          overflow: el.style.overflow,
+        };
+
+        // Fix oklch colors by getting computed RGB values
+        const color = computedStyle.color;
+        const bgColor = computedStyle.backgroundColor;
+        const borderColor = computedStyle.borderColor;
+
+        if (color && (color.includes('oklch') || color.includes('color('))) {
+          el.style.color = computedStyle.color; // Force computed value
+        }
+        if (
+          bgColor &&
+          (bgColor.includes('oklch') || bgColor.includes('color('))
+        ) {
+          el.style.backgroundColor = computedStyle.backgroundColor;
+        }
+        if (
+          borderColor &&
+          (borderColor.includes('oklch') || borderColor.includes('color('))
+        ) {
+          el.style.borderColor = computedStyle.borderColor;
+        }
+
+        // Fix text rendering
+        if (el.style.display === '-webkit-box') {
+          el.style.display = 'block';
+        }
+        el.style.WebkitLineClamp = 'unset';
+        el.style.WebkitBoxOrient = 'unset';
+
+        // Fix text wrapping
+        if (el.textContent && el.textContent.trim()) {
+          el.style.whiteSpace = 'normal';
+          el.style.wordWrap = 'break-word';
+          el.style.wordBreak = 'break-word';
+          el.style.overflowWrap = 'break-word';
+        }
+      });
+
+      // Wait for styles to apply
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // Capture screenshot with modern-screenshot
+      const dataUrl = await domToPng(flowElement, {
+        backgroundColor: '#f9fafb',
+        scale: 2,
+        quality: 1,
+        pixelRatio: 2,
+        features: {
+          removeControlCharacter: true,
+        },
+        // Don't use width/height to let it capture natural size
+        style: {
+          transform: 'scale(1)',
+        },
+      });
+
+      // Restore all original styles
+      allElements.forEach((el, index) => {
+        const original = originalStyles[index];
+        if (original && original.element === el) {
+          el.style.color = original.color;
+          el.style.backgroundColor = original.backgroundColor;
+          el.style.borderColor = original.borderColor;
+          el.style.display = original.display;
+          el.style.WebkitLineClamp = original.WebkitLineClamp;
+          el.style.WebkitBoxOrient = original.WebkitBoxOrient;
+          el.style.whiteSpace = original.whiteSpace;
+          el.style.overflow = original.overflow;
+        }
+      });
+
+      // Restore hidden elements
+      elementsToHide.forEach((el, i) => {
+        el.style.display = originalDisplays[i];
+      });
+
+      // Download
+      const link = document.createElement('a');
+      link.download = `diagram-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error('Screenshot error:', error);
+
+      // Restore on error
+      const minimap = document.querySelector('.react-flow__minimap');
+      const controls = document.querySelector('.react-flow__controls');
+      const toolbar = document.querySelector('.absolute.top-4.left-4');
+      [minimap, controls, toolbar].forEach((el) => {
+        if (el) el.style.display = '';
+      });
+
+      alert('Failed to capture screenshot. Error: ' + error.message);
+    }
+  }, []);
+
+  // const handleScreenshot = useCallback(async () => {
+  //   try {
+  //     const flowElement = document.querySelector('.react-flow');
+
+  //     if (!flowElement) {
+  //       alert('Unable to find diagram');
+  //       return;
+  //     }
+
+  //     // Hide UI elements temporarily
+  //     const minimap = document.querySelector('.react-flow__minimap');
+  //     const controls = document.querySelector('.react-flow__controls');
+  //     const toolbar = document.querySelector('.absolute.top-4.left-4');
+
+  //     const elementsToHide = [minimap, controls, toolbar].filter(Boolean);
+  //     const originalDisplays = elementsToHide.map((el) => el.style.display);
+  //     elementsToHide.forEach((el) => (el.style.display = 'none'));
+
+  //     // Wait for elements to hide
+  //     await new Promise((resolve) => setTimeout(resolve, 150));
+
+  //     // Capture using modern-screenshot (handles oklch and all modern CSS)
+  //     const dataUrl = await domToPng(flowElement, {
+  //       backgroundColor: '#f9fafb',
+  //       scale: 2, // High quality
+  //       features: {
+  //         // Removes clipping paths for better compatibility
+  //         removeControlCharacter: true,
+  //       },
+  //     });
+
+  //     // Restore hidden elements
+  //     elementsToHide.forEach((el, i) => {
+  //       el.style.display = originalDisplays[i];
+  //     });
+
+  //     // Download
+  //     const link = document.createElement('a');
+  //     link.download = `diagram-${Date.now()}.png`;
+  //     link.href = dataUrl;
+  //     link.click();
+  //   } catch (error) {
+  //     console.error('Screenshot error:', error);
+
+  //     // Restore elements on error
+  //     const minimap = document.querySelector('.react-flow__minimap');
+  //     const controls = document.querySelector('.react-flow__controls');
+  //     const toolbar = document.querySelector('.absolute.top-4.left-4');
+  //     [minimap, controls, toolbar].forEach((el) => {
+  //       if (el) el.style.display = '';
+  //     });
+
+  //     alert('Failed to capture screenshot: ' + error.message);
+  //   }
+  // }, []);
 
   // Redux State and Dispatch
   const diagramType = useSelector((state) => state.diagram.diagramType);
@@ -523,6 +711,7 @@ function FlowCanvas({
           onAddGroup={() => addResizableRectangle('styledRectangle')}
           onAddCustomNode={addCustomNode}
           isLoading={loading}
+          onScreenshot={handleScreenshot}
         />
 
         <ReactFlow

@@ -6,7 +6,8 @@ import {
   Group,
   Square,
   Table,
-} from 'lucide-react'; // Import Table icon
+  Camera,
+} from 'lucide-react';
 import { useSelector } from 'react-redux';
 
 export default function JamboardToolbar({
@@ -15,11 +16,11 @@ export default function JamboardToolbar({
   onAddRectangle,
   onAddGroup,
   onAddCustomNode,
-  onAddDbTable, // New prop for adding DB Table node
+  onScreenshot,
   isLoading = false,
 }) {
   const diagramType = useSelector((state) => state.diagram.diagramType);
-  // Define the common tools
+
   const commonTools = [
     {
       id: 'rectangle',
@@ -30,36 +31,44 @@ export default function JamboardToolbar({
     { id: 'group', icon: Group, label: 'Group', onClick: onAddGroup },
   ];
 
-  // Define tools specific to 'architecture' diagram
   const architectureTools = [
     {
       id: 'custom-node',
       icon: Square,
       label: 'Custom Node',
-      onClick: () => onAddCustomNode(('New custom Node', 'custom')),
+      onClick: () => onAddCustomNode('New custom Node', 'custom'),
     },
   ];
 
-  // Define tools specific to 'db_diagram'
   const dbDiagramTools = [
     {
       id: 'db-table',
-      icon: Table, // Using Table icon for DB Table node
+      icon: Table,
       label: 'DB Table',
-      onClick: () => onAddCustomNode('New db Node', 'dbTableNode'), // Call the new handler for DB Table
+      onClick: () => onAddCustomNode('New db Node', 'dbTableNode'),
     },
   ];
 
-  // Dynamically determine which tools to display based on diagramType
   const currentTools =
     diagramType === 'architecture'
       ? [...commonTools, ...architectureTools]
       : diagramType === 'db_diagram'
       ? [...commonTools, ...dbDiagramTools]
-      : commonTools; // Default to common tools if no specific type
+      : commonTools;
 
   const actions = [
-    { id: 'export', icon: Download, label: 'Export JSON', onClick: onExport },
+    {
+      id: 'screenshot',
+      icon: Camera,
+      label: 'Screenshot',
+      onClick: onScreenshot,
+    },
+    {
+      id: 'export',
+      icon: Download,
+      label: 'Export JSON',
+      onClick: onExport,
+    },
     {
       id: 'import',
       icon: Upload,
@@ -69,11 +78,10 @@ export default function JamboardToolbar({
     },
   ];
 
-  // Helper component for consistent button styling and tooltip
   const ToolButton = ({ tool, className = '' }) => (
     <button
       onClick={tool.onClick}
-      disabled={isLoading} // Disable all buttons when loading
+      disabled={isLoading}
       className={`
         relative group flex items-center justify-center
         w-8 h-8 rounded-md transition-all duration-200 flex-shrink-0
@@ -89,7 +97,6 @@ export default function JamboardToolbar({
     >
       <tool.icon size={16} strokeWidth={1.5} />
 
-      {/* Tooltip */}
       <div
         className='absolute left-12 top-1/2 transform -translate-y-1/2
                     bg-gray-900 text-white text-xs px-2 py-1 rounded
@@ -106,17 +113,14 @@ export default function JamboardToolbar({
       className='absolute top-4 left-4 z-10 flex flex-col items-center gap-1
                     bg-white rounded-xl shadow-lg border border-gray-200 p-2 h-fit'
     >
-      {/* Tools Section */}
       <div className='flex flex-col gap-1 w-full'>
         {currentTools.map((tool) => (
           <ToolButton key={tool.id} tool={tool} />
         ))}
       </div>
 
-      {/* Separator */}
       <div className='h-px w-6 bg-gray-200 my-1 flex-shrink-0' />
 
-      {/* Actions Section */}
       <div className='flex flex-col gap-1 w-full'>
         {actions.map((tool) =>
           tool.isFileImport ? (
@@ -142,7 +146,6 @@ export default function JamboardToolbar({
                 className='hidden'
                 disabled={isLoading}
               />
-              {/* Tooltip for import */}
               <div
                 className='absolute left-12 top-1/2 transform -translate-y-1/2
                             bg-gray-900 text-white text-xs px-2 py-1 rounded

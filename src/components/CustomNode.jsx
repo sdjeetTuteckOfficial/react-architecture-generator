@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { Pencil, Type } from 'lucide-react';
-
 import { Handle, Position, NodeResizer } from 'reactflow';
 
 export default function CustomNode({ data = {}, id = '1', selected = true }) {
@@ -8,35 +7,31 @@ export default function CustomNode({ data = {}, id = '1', selected = true }) {
   const labelRef = useRef(null);
 
   const handleNodeClick = (event) => {
-    // Prevent node selection when clicking on resize handles
     if (
       event.target.closest('.react-flow__resize-control') ||
       event.target.closest('.react-flow__handle')
     ) {
       return;
     }
-    // if (data.onEdit) {
-    //   data.onEdit(id);
-    // }
   };
 
   return (
     <div
       className={`relative flex flex-col bg-white border-2 ${
         selected ? 'border-blue-500 shadow-lg' : 'border-gray-300 shadow-md'
-      } rounded-xl transition-all duration-200 ease-in-out overflow-visible`}
+      } rounded-xl transition-all duration-200 ease-in-out`}
       style={{
         width: '100%',
         height: '100%',
         minWidth: '100px',
         minHeight: '70px',
         background: 'linear-gradient(145deg, #f0f4f8, #e6e9ee)',
+        overflow: 'visible',
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={handleNodeClick}
     >
-      {/* NodeResizer - only shows when node is selected */}
       <NodeResizer
         color='#2563eb'
         isVisible={selected}
@@ -46,7 +41,6 @@ export default function CustomNode({ data = {}, id = '1', selected = true }) {
         maxHeight={250}
       />
 
-      {/* Handles: Properly positioned for edge connections */}
       <Handle
         type='target'
         position={Position.Top}
@@ -81,29 +75,58 @@ export default function CustomNode({ data = {}, id = '1', selected = true }) {
       />
 
       {/* Main content area */}
-      <div className='flex flex-col items-center justify-center flex-grow p-2 text-center overflow-hidden'>
+      <div
+        className='flex flex-col items-center justify-center flex-grow p-3 text-center'
+        style={{
+          overflow: 'visible',
+          gap: '4px',
+        }}
+      >
         {data.image && (
-          <img
-            src={data.image}
-            alt='Node content'
-            className='max-w-[calc(100%-10px)] max-h-[50px] object-contain mb-1'
-            style={{ pointerEvents: 'none' }}
-          />
+          <div
+            style={{
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginBottom: '4px',
+              minHeight: '50px',
+              maxHeight: '50px',
+            }}
+          >
+            <img
+              src={data.image}
+              alt='Node content'
+              style={{
+                maxWidth: 'calc(100% - 10px)',
+                maxHeight: '50px',
+                width: 'auto',
+                height: 'auto',
+                objectFit: 'contain',
+                display: 'block',
+                pointerEvents: 'none',
+              }}
+              crossOrigin='anonymous'
+            />
+          </div>
         )}
 
-        {/* Label: Always takes available space and wraps */}
+        {/* Label with proper text wrapping */}
         <div
           ref={labelRef}
-          className='text-xs font-semibold text-gray-800 break-words px-1'
+          className='text-xs font-semibold text-gray-800'
           style={{
-            flexShrink: 0,
-            maxHeight: data.image ? 'calc(100% - 60px)' : 'calc(100% - 30px)',
-            overflowY: 'auto',
-            lineHeight: '1.3',
-            display: '-webkit-box',
-            WebkitLineClamp: 3,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
+            width: '100%',
+            wordWrap: 'break-word',
+            wordBreak: 'break-word',
+            overflowWrap: 'break-word',
+            whiteSpace: 'normal',
+            hyphens: 'auto',
+            lineHeight: '1.4',
+            textAlign: 'center',
+            display: 'block',
+            paddingLeft: '4px',
+            paddingRight: '4px',
           }}
         >
           {!data.image && !data.label && selected ? (
@@ -114,7 +137,6 @@ export default function CustomNode({ data = {}, id = '1', selected = true }) {
         </div>
       </div>
 
-      {/* Edit button: Always visible on hover or when node is selected */}
       {(hovered || selected) && (
         <button
           className='absolute top-1 right-1 bg-white text-gray-600 rounded-full p-1 shadow-sm hover:bg-gray-100 hover:text-blue-500 transition-all duration-200 ease-in-out z-20'

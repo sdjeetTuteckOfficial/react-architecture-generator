@@ -18,6 +18,7 @@
     "file-saver": "^2.0.5",
     "jszip": "^3.10.1",
     "lucide-react": "^0.525.0",
+    "modern-screenshot": "^4.6.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-hook-form": "^7.62.0",
