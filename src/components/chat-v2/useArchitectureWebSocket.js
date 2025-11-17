@@ -162,6 +162,22 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
           }
           break;
 
+        case 'diagram_drag_updated':
+          setIsProcessing(false);
+          setCurrentThreadId(data.thread_id);
+          setClarificationProgress(null);
+          setCurrentVersion(data.version + 1);
+          dispatch(triggerThreadRefresh());
+          addMessage('bot', data.message);
+
+          if (data.metadata) {
+            addMessage(
+              'bot',
+              `📊 ${data.metadata.node_count} components, ${data.metadata.edge_count} connections`
+            );
+          }
+          break;
+
         case 'error':
           setIsProcessing(false);
           addMessage('bot', data.message, { isError: true });
@@ -446,6 +462,16 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
     [sendMessage, addMessage]
   );
 
+  const dragDiagram = useCallback(
+    (diagram) => {
+      return sendMessage({
+        type: 'drag',
+        diagram,
+      });
+    },
+    [sendMessage]
+  );
+
   useEffect(() => {
     isUnmountedRef.current = false;
     console.log('🚀 Component mounted, connecting...');
@@ -483,6 +509,7 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
     analyzeProject,
     modifyDiagram, // ✅ Export the new function
     sendClarificationResponse,
+    dragDiagram, // ✅ NEW: Export drag function
     addMessage,
   };
 };

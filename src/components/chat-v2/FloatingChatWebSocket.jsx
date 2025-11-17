@@ -21,7 +21,11 @@ import {
 } from 'lucide-react';
 import useArchitectureWebSocket from './useArchitectureWebSocket';
 
-const FloatingChatWebSocket = ({ handleGenerateDiagram, onThreadIdChange }) => {
+const FloatingChatWebSocket = ({
+  handleGenerateDiagram,
+  onThreadIdChange,
+  onDragDiagram,
+}) => {
   const dispatch = useDispatch();
   const diagramType = useSelector((state) => state.diagram.diagramType);
   const clientId = useRef(
@@ -54,10 +58,18 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram, onThreadIdChange }) => {
     analyzeProject,
     modifyDiagram,
     sendClarificationResponse,
+    dragDiagram,
   } = useArchitectureWebSocket({
     onDiagramGenerated: handleGenerateDiagram,
     clientId,
   });
+
+  // Expose dragDiagram to parent component
+  useEffect(() => {
+    if (onDragDiagram) {
+      onDragDiagram(dragDiagram);
+    }
+  }, [dragDiagram, onDragDiagram]);
   useEffect(() => {
     if (onThreadIdChange && currentThreadId) {
       console.log('🔄 Syncing thread ID to parent:', currentThreadId);

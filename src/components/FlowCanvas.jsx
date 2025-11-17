@@ -14,7 +14,6 @@ import EditModal from '../components/EditModal';
 import JamboardToolbar from './Toolbar';
 import { fetchDiagramJSON } from '../api/gemini';
 import { domToPng } from 'modern-screenshot';
-import axiosInstance from '../security/axios-instance';
 import {
   NODE_TYPES,
   RECTANGLE_CONFIGS,
@@ -155,41 +154,6 @@ const SaveStatusToast = ({ status, message }) => {
   );
 };
 
-// API call function for saving
-const saveFlowChanges = async (threadId, nodes, edges, diagramType) => {
-  try {
-    const diagramData = {
-      nodes: nodes,
-      edges: edges,
-      metadata: {
-        diagram_type: diagramType,
-        node_count: nodes.length,
-        edge_count: edges.length,
-        timestamp: new Date().toISOString(),
-      },
-    };
-
-    const response = await axiosInstance.patch('/api/modify-diagram', {
-      thread_id: threadId,
-      diagram: diagramData,
-    });
-
-    // Axios returns data directly in response.data
-    const result = response.data;
-
-    // Check if the backend indicates success
-    if (!result.success) {
-      throw new Error(result.message || 'Failed to save changes');
-    }
-
-    console.log('✅ Diagram saved:', result);
-    return result;
-  } catch (error) {
-    console.error('❌ Save failed:', error);
-    throw error;
-  }
-};
-
 // FlowCanvas Component
 function FlowCanvas({
   nodes,
@@ -222,6 +186,7 @@ function FlowCanvas({
 
   const lastSaveRef = useRef(null);
   const statusTimeoutRef = useRef(null);
+  const dragDiagramRef = useRef(null);
 
   // Auto-hide success/error messages after 3 seconds
   useEffect(() => {
@@ -237,7 +202,7 @@ function FlowCanvas({
     };
   }, [saveStatus]);
 
-  // Manual save function
+  // Manual save function (kept for backward compatibility, but uses WebSocket drag)
   const handleManualUpdate = useCallback(async () => {
     if (!currentThreadId || nodes.length === 0) {
       console.log('⏭️ Cannot save: No thread or nodes', {
@@ -247,7 +212,7 @@ function FlowCanvas({
       return;
     }
 
-    console.log('💾 Manually saving diagram changes...', {
+    console.log('💾 Sending drag update via WebSocket...', {
       threadId: currentThreadId,
       nodeCount: nodes.length,
       edgeCount: edges.length,
@@ -256,22 +221,49 @@ function FlowCanvas({
     setIsSaving(true);
 
     try {
-      await saveFlowChanges(currentThreadId, nodes, edges, diagramType);
+      // Send drag event via WebSocket
+      if (dragDiagramRef.current) {
+        const diagramData = {
+          nodes: nodes,
+          edges: edges,
+          metadata: {
+            diagram_type: diagramType,
+            node_count: nodes.length,
+            edge_count: edges.length,
+            timestamp: new Date().toISOString(),
+          },
+        };
 
-      const currentState = JSON.stringify({
-        nodes: nodes.map((n) => ({ id: n.id, position: n.position })),
-        edges: edges.map((e) => ({
-          id: e.id,
-          source: e.source,
-          target: e.target,
-        })),
-      });
-      lastSaveRef.current = currentState;
+        const success = dragDiagramRef.current(diagramData);
 
-      setHasUnsavedChanges(false);
-      setSaveStatus('success');
-      setSaveMessage('Diagram updated successfully!');
-      console.log('✅ Save complete');
+        if (success) {
+          const currentState = JSON.stringify({
+            nodes: nodes.map((n) => ({ id: n.id, position: n.position })),
+            edges: edges.map((e) => ({
+              id: e.id,
+              source: e.source,
+              target: e.target,
+            })),
+          });
+          lastSaveRef.current = currentState;
+
+          setHasUnsavedChanges(false);
+          setSaveStatus('success');
+          setSaveMessage('Diagram updated successfully!');
+          console.log('✅ Drag update sent via WebSocket');
+        } else {
+          setSaveStatus('error');
+          setSaveMessage('Failed to send drag update');
+          console.error('❌ WebSocket not ready');
+        }
+      } else {
+        // WebSocket not available yet - show popover
+        console.log(
+          '⚠️ WebSocket drag not available, please wait for connection'
+        );
+        setSaveStatus('error');
+        setSaveMessage('WebSocket not connected, please try again');
+      }
     } catch (error) {
       setSaveStatus('error');
       setSaveMessage('Failed to update diagram');
@@ -775,13 +767,56 @@ function FlowCanvas({
     return '#1a192b';
   }, []);
 
-  // Handle node drag stop - show change notification
+  // Handle node drag stop - send drag event via WebSocket or show change notification
   const onNodeDragStop = useCallback(
     (event, node) => {
       console.log('🎯 Node drag stopped:', node.id);
-      checkForChanges();
+
+      // If WebSocket drag is available and thread exists, send immediately
+      if (dragDiagramRef.current && currentThreadId && nodes.length > 0) {
+        console.log('📤 Sending drag event via WebSocket');
+
+        const diagramData = {
+          nodes: nodes,
+          edges: edges,
+          metadata: {
+            diagram_type: diagramType,
+            node_count: nodes.length,
+            edge_count: edges.length,
+            timestamp: new Date().toISOString(),
+          },
+        };
+
+        const success = dragDiagramRef.current(diagramData);
+        if (success) {
+          const currentState = JSON.stringify({
+            nodes: nodes.map((n) => ({ id: n.id, position: n.position })),
+            edges: edges.map((e) => ({
+              id: e.id,
+              source: e.source,
+              target: e.target,
+            })),
+          });
+          lastSaveRef.current = currentState;
+          setHasUnsavedChanges(false);
+          console.log('✅ Drag sent via WebSocket');
+        } else {
+          // If WebSocket fails, show the popover for manual save
+          checkForChanges();
+        }
+      } else {
+        // Fallback: show change notification popover
+        checkForChanges();
+      }
     },
-    [checkForChanges]
+    [
+      nodes,
+      edges,
+      currentThreadId,
+      diagramType,
+      dragDiagramRef,
+      checkForChanges,
+    ]
   );
 
   // Enhanced onNodesChange to detect movements
@@ -820,6 +855,12 @@ function FlowCanvas({
   const handleThreadIdChange = useCallback((threadId) => {
     console.log('🔄 Thread ID updated:', threadId);
     setCurrentThreadId(threadId);
+  }, []);
+
+  // Callback to receive dragDiagram function from WebSocket component
+  const handleDragDiagramCallback = useCallback((dragFunction) => {
+    console.log('🔗 Drag function received from WebSocket');
+    dragDiagramRef.current = dragFunction;
   }, []);
 
   useEffect(() => {
@@ -993,6 +1034,7 @@ function FlowCanvas({
       <FloatingChatWebSocket
         handleGenerateDiagram={handleDiagramUpdate}
         onThreadIdChange={handleThreadIdChange}
+        onDragDiagram={handleDragDiagramCallback}
       />
     </>
   );
