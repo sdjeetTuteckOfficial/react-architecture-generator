@@ -68,6 +68,7 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
 
         case 'thread_created':
           setCurrentThreadId(data.thread_id);
+          console.log('hehe', data);
           setCurrentVersion(0);
           setConversationHistory([]); // Clear history for new thread
           setMemoryContext(null);
@@ -126,6 +127,7 @@ export const useArchitectureWebSocket = ({ onDiagramGenerated, clientId }) => {
         case 'diagram_modified':
           setIsProcessing(false);
           setAwaitingClarification(false);
+          setCurrentThreadId(data.thread_id);
           setClarificationProgress(null);
           setCurrentVersion(data.version + 1);
           dispatch(triggerThreadRefresh());

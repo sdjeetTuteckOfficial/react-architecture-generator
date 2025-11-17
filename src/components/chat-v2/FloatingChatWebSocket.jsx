@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import useArchitectureWebSocket from './useArchitectureWebSocket';
 
-const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
+const FloatingChatWebSocket = ({ handleGenerateDiagram, onThreadIdChange }) => {
   const dispatch = useDispatch();
   const diagramType = useSelector((state) => state.diagram.diagramType);
   const clientId = useRef(
@@ -58,6 +58,12 @@ const FloatingChatWebSocket = ({ handleGenerateDiagram }) => {
     onDiagramGenerated: handleGenerateDiagram,
     clientId,
   });
+  useEffect(() => {
+    if (onThreadIdChange && currentThreadId) {
+      console.log('🔄 Syncing thread ID to parent:', currentThreadId);
+      onThreadIdChange(currentThreadId);
+    }
+  }, [currentThreadId, onThreadIdChange]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

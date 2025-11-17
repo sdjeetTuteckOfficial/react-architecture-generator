@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -8,14 +8,13 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useSelector, useDispatch } from 'react-redux';
+import { Save, Check, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import DbTableEditor from './DbTableEditor';
 import EditModal from '../components/EditModal';
-// import ChatInput from '../components/ChatInput';
 import JamboardToolbar from './Toolbar';
 import { fetchDiagramJSON } from '../api/gemini';
 import { domToPng } from 'modern-screenshot';
-
-// Import constants and utilities
+import axiosInstance from '../security/axios-instance';
 import {
   NODE_TYPES,
   RECTANGLE_CONFIGS,
@@ -30,9 +29,168 @@ import {
   isWithinBounds,
 } from '../hooks/useFlowStates';
 import FloatingChatWebSocket from './chat-v2/FloatingChatWebSocket';
-import FloatingChatButton from './chat/FloatingChatButton';
 
-// FlowCanvas now accepts all flow state and setters as props
+// Change Notification Popover Component
+const ChangeNotificationPopover = ({ isVisible, onUpdate, isSaving }) => {
+  if (!isVisible) return null;
+
+  return (
+    <div
+      className='fixed top-20 right-8 z-[60]'
+      style={{ animation: 'slideIn 0.3s ease-out' }}
+    >
+      <style>{`
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes pulse {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+          }
+          50% {
+            box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+          }
+        }
+      `}</style>
+      <div className='bg-white rounded-2xl shadow-2xl border border-blue-200 backdrop-blur-sm overflow-hidden'>
+        <div className='px-5 py-3.5 bg-gradient-to-r from-blue-50 to-indigo-50'>
+          <div className='flex items-center gap-3'>
+            <div className='flex items-center justify-center w-8 h-8 rounded-full bg-blue-100'>
+              <RefreshCw size={16} className='text-blue-600' />
+            </div>
+            <div className='flex-1'>
+              <p className='text-sm font-semibold text-gray-800'>
+                Diagram Changed
+              </p>
+              <p className='text-xs text-gray-600'>
+                Your changes are not saved yet
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className='px-5 py-3 bg-white border-t border-gray-100'>
+          <button
+            onClick={onUpdate}
+            disabled={isSaving}
+            className='w-full px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 disabled:from-gray-400 disabled:to-gray-400 text-white text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:cursor-not-allowed'
+            style={
+              !isSaving
+                ? {
+                    animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                  }
+                : {}
+            }
+          >
+            {isSaving ? (
+              <>
+                <Loader2 size={16} className='animate-spin' />
+                <span>Updating...</span>
+              </>
+            ) : (
+              <>
+                <Save size={16} />
+                <span>Update Diagram</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Save Status Toast Component (for success/error messages)
+const SaveStatusToast = ({ status, message }) => {
+  if (status === 'idle') return null;
+
+  const statusConfig = {
+    success: {
+      icon: Check,
+      bgColor: 'bg-green-500',
+      textColor: 'text-white',
+      iconClass: '',
+    },
+    error: {
+      icon: AlertCircle,
+      bgColor: 'bg-red-500',
+      textColor: 'text-white',
+      iconClass: '',
+    },
+  };
+
+  const config = statusConfig[status] || statusConfig.success;
+  const Icon = config.icon;
+
+  return (
+    <div
+      className='fixed top-20 right-8 z-[60]'
+      style={{ animation: 'slideIn 0.3s ease-out' }}
+    >
+      <style>{`
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+      <div
+        className={`${config.bgColor} ${config.textColor} rounded-2xl shadow-2xl px-5 py-3.5 flex items-center gap-3 border border-white/20 backdrop-blur-sm`}
+      >
+        <Icon size={20} className={config.iconClass} />
+        <span className='font-medium text-sm'>{message}</span>
+      </div>
+    </div>
+  );
+};
+
+// API call function for saving
+const saveFlowChanges = async (threadId, nodes, edges, diagramType) => {
+  try {
+    const diagramData = {
+      nodes: nodes,
+      edges: edges,
+      metadata: {
+        diagram_type: diagramType,
+        node_count: nodes.length,
+        edge_count: edges.length,
+        timestamp: new Date().toISOString(),
+      },
+    };
+
+    const response = await axiosInstance.patch('/api/modify-diagram', {
+      thread_id: threadId,
+      diagram: diagramData,
+    });
+
+    // Axios returns data directly in response.data
+    const result = response.data;
+
+    // Check if the backend indicates success
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to save changes');
+    }
+
+    console.log('✅ Diagram saved:', result);
+    return result;
+  } catch (error) {
+    console.error('❌ Save failed:', error);
+    throw error;
+  }
+};
+
+// FlowCanvas Component
 function FlowCanvas({
   nodes,
   setNodes,
@@ -52,6 +210,94 @@ function FlowCanvas({
   setLoading,
 }) {
   const { fitView, project, getViewport, toObject } = useReactFlow();
+  const diagramType = useSelector((state) => state.diagram.diagramType);
+  const dispatch = useDispatch();
+
+  // Change detection state
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('idle');
+  const [saveMessage, setSaveMessage] = useState('');
+  const [currentThreadId, setCurrentThreadId] = useState(null);
+
+  const lastSaveRef = useRef(null);
+  const statusTimeoutRef = useRef(null);
+
+  // Auto-hide success/error messages after 3 seconds
+  useEffect(() => {
+    if (saveStatus === 'success' || saveStatus === 'error') {
+      statusTimeoutRef.current = setTimeout(() => {
+        setSaveStatus('idle');
+      }, 3000);
+    }
+    return () => {
+      if (statusTimeoutRef.current) {
+        clearTimeout(statusTimeoutRef.current);
+      }
+    };
+  }, [saveStatus]);
+
+  // Manual save function
+  const handleManualUpdate = useCallback(async () => {
+    if (!currentThreadId || nodes.length === 0) {
+      console.log('⏭️ Cannot save: No thread or nodes', {
+        threadId: currentThreadId,
+        nodeCount: nodes.length,
+      });
+      return;
+    }
+
+    console.log('💾 Manually saving diagram changes...', {
+      threadId: currentThreadId,
+      nodeCount: nodes.length,
+      edgeCount: edges.length,
+    });
+
+    setIsSaving(true);
+
+    try {
+      await saveFlowChanges(currentThreadId, nodes, edges, diagramType);
+
+      const currentState = JSON.stringify({
+        nodes: nodes.map((n) => ({ id: n.id, position: n.position })),
+        edges: edges.map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+        })),
+      });
+      lastSaveRef.current = currentState;
+
+      setHasUnsavedChanges(false);
+      setSaveStatus('success');
+      setSaveMessage('Diagram updated successfully!');
+      console.log('✅ Save complete');
+    } catch (error) {
+      setSaveStatus('error');
+      setSaveMessage('Failed to update diagram');
+      console.error('❌ Save error:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [currentThreadId, nodes, edges, diagramType]);
+
+  // Check for changes
+  const checkForChanges = useCallback(() => {
+    if (!currentThreadId || nodes.length === 0) return;
+
+    const currentState = JSON.stringify({
+      nodes: nodes.map((n) => ({ id: n.id, position: n.position })),
+      edges: edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+      })),
+    });
+
+    if (lastSaveRef.current && lastSaveRef.current !== currentState) {
+      setHasUnsavedChanges(true);
+    }
+  }, [currentThreadId, nodes, edges]);
 
   const handleScreenshot = useCallback(async () => {
     try {
@@ -62,7 +308,6 @@ function FlowCanvas({
         return;
       }
 
-      // Hide UI elements
       const minimap = document.querySelector('.react-flow__minimap');
       const controls = document.querySelector('.react-flow__controls');
       const toolbar = document.querySelector('.absolute.top-4.left-4');
@@ -71,7 +316,6 @@ function FlowCanvas({
       const originalDisplays = elementsToHide.map((el) => el.style.display);
       elementsToHide.forEach((el) => (el.style.display = 'none'));
 
-      // CRITICAL: Fix all elements with oklch colors and text issues
       const allElements = flowElement.querySelectorAll('*');
       const originalStyles = [];
 
@@ -90,13 +334,12 @@ function FlowCanvas({
           overflow: el.style.overflow,
         };
 
-        // Fix oklch colors by getting computed RGB values
         const color = computedStyle.color;
         const bgColor = computedStyle.backgroundColor;
         const borderColor = computedStyle.borderColor;
 
         if (color && (color.includes('oklch') || color.includes('color('))) {
-          el.style.color = computedStyle.color; // Force computed value
+          el.style.color = computedStyle.color;
         }
         if (
           bgColor &&
@@ -111,14 +354,12 @@ function FlowCanvas({
           el.style.borderColor = computedStyle.borderColor;
         }
 
-        // Fix text rendering
         if (el.style.display === '-webkit-box') {
           el.style.display = 'block';
         }
         el.style.WebkitLineClamp = 'unset';
         el.style.WebkitBoxOrient = 'unset';
 
-        // Fix text wrapping
         if (el.textContent && el.textContent.trim()) {
           el.style.whiteSpace = 'normal';
           el.style.wordWrap = 'break-word';
@@ -127,10 +368,8 @@ function FlowCanvas({
         }
       });
 
-      // Wait for styles to apply
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-      // Capture screenshot with modern-screenshot
       const dataUrl = await domToPng(flowElement, {
         backgroundColor: '#f9fafb',
         scale: 2,
@@ -139,13 +378,11 @@ function FlowCanvas({
         features: {
           removeControlCharacter: true,
         },
-        // Don't use width/height to let it capture natural size
         style: {
           transform: 'scale(1)',
         },
       });
 
-      // Restore all original styles
       allElements.forEach((el, index) => {
         const original = originalStyles[index];
         if (original && original.element === el) {
@@ -160,12 +397,10 @@ function FlowCanvas({
         }
       });
 
-      // Restore hidden elements
       elementsToHide.forEach((el, i) => {
         el.style.display = originalDisplays[i];
       });
 
-      // Download
       const link = document.createElement('a');
       link.download = `diagram-${Date.now()}.png`;
       link.href = dataUrl;
@@ -173,7 +408,6 @@ function FlowCanvas({
     } catch (error) {
       console.error('Screenshot error:', error);
 
-      // Restore on error
       const minimap = document.querySelector('.react-flow__minimap');
       const controls = document.querySelector('.react-flow__controls');
       const toolbar = document.querySelector('.absolute.top-4.left-4');
@@ -184,66 +418,6 @@ function FlowCanvas({
       alert('Failed to capture screenshot. Error: ' + error.message);
     }
   }, []);
-
-  // const handleScreenshot = useCallback(async () => {
-  //   try {
-  //     const flowElement = document.querySelector('.react-flow');
-
-  //     if (!flowElement) {
-  //       alert('Unable to find diagram');
-  //       return;
-  //     }
-
-  //     // Hide UI elements temporarily
-  //     const minimap = document.querySelector('.react-flow__minimap');
-  //     const controls = document.querySelector('.react-flow__controls');
-  //     const toolbar = document.querySelector('.absolute.top-4.left-4');
-
-  //     const elementsToHide = [minimap, controls, toolbar].filter(Boolean);
-  //     const originalDisplays = elementsToHide.map((el) => el.style.display);
-  //     elementsToHide.forEach((el) => (el.style.display = 'none'));
-
-  //     // Wait for elements to hide
-  //     await new Promise((resolve) => setTimeout(resolve, 150));
-
-  //     // Capture using modern-screenshot (handles oklch and all modern CSS)
-  //     const dataUrl = await domToPng(flowElement, {
-  //       backgroundColor: '#f9fafb',
-  //       scale: 2, // High quality
-  //       features: {
-  //         // Removes clipping paths for better compatibility
-  //         removeControlCharacter: true,
-  //       },
-  //     });
-
-  //     // Restore hidden elements
-  //     elementsToHide.forEach((el, i) => {
-  //       el.style.display = originalDisplays[i];
-  //     });
-
-  //     // Download
-  //     const link = document.createElement('a');
-  //     link.download = `diagram-${Date.now()}.png`;
-  //     link.href = dataUrl;
-  //     link.click();
-  //   } catch (error) {
-  //     console.error('Screenshot error:', error);
-
-  //     // Restore elements on error
-  //     const minimap = document.querySelector('.react-flow__minimap');
-  //     const controls = document.querySelector('.react-flow__controls');
-  //     const toolbar = document.querySelector('.absolute.top-4.left-4');
-  //     [minimap, controls, toolbar].forEach((el) => {
-  //       if (el) el.style.display = '';
-  //     });
-
-  //     alert('Failed to capture screenshot: ' + error.message);
-  //   }
-  // }, []);
-
-  // Redux State and Dispatch
-  const diagramType = useSelector((state) => state.diagram.diagramType);
-  const dispatch = useDispatch(); // You have this here, but setUserPrompt isn't dispatched in this file directly
 
   const handleEditNode = useCallback(
     (nodeId) => {
@@ -259,58 +433,52 @@ function FlowCanvas({
     [setNodes, setSelectedNode, setIsModalOpen]
   );
 
-  const handleDiagramUpdate = (data) => {
-    console.log('Updating diagram with data:', data);
-    const newNodes = data.nodes.map((node) => {
-      let nodeType = 'custom';
-      let nodeData = { ...node.data, onEdit: handleEditNode };
-      console.log('diagramType', diagramType);
-      if (data.metadata.diagram_type === 'architecture') {
-        nodeType = node.data.image ? 'custom' : 'default';
-        nodeData.image = processImagePath(node.data.image);
-      } else if (data.metadata.diagram_type === 'db_diagram') {
-        console.log('Creating DB node:', nodeType, node.data);
-        nodeType = 'dbTableNode';
-      }
+  const handleDiagramUpdate = useCallback(
+    (data) => {
+      console.log('Updating diagram with data:', data);
+      const newNodes = data.nodes.map((node) => {
+        let nodeType = 'custom';
+        let nodeData = { ...node.data, onEdit: handleEditNode };
 
-      return {
-        ...node,
-        type: nodeType,
-        position: node.position || { x: 100, y: 100 },
-        data: nodeData,
-        zIndex: node.zIndex || 1,
-      };
-    });
+        if (data.metadata.diagram_type === 'architecture') {
+          nodeType = node.data.image ? 'custom' : 'default';
+          nodeData.image = processImagePath(node.data.image);
+        } else if (data.metadata.diagram_type === 'db_diagram') {
+          nodeType = 'dbTableNode';
+        }
 
-    const nodeIds = new Set(newNodes.map((n) => n.id));
-    const newEdges = data.edges
-      .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
-      .map((e, i) => ({ id: e.id || `edge-${i}`, ...e }));
-    console.log('new', newNodes, newEdges);
-    setNodes(newNodes);
-    setEdges(newEdges);
-    setTimeout(() => fitView({ padding: 0.2 }), 100);
-    // Update nodes with proper onEdit handlers
-    // const updatedNodes = diagramData.nodes.map((node) => ({
-    //   ...node,
-    //   data: {
-    //     ...node.data,
-    //     onEdit: handleEditNode,
-    //   },
-    // }));
+        return {
+          ...node,
+          type: nodeType,
+          position: node.position || { x: 100, y: 100 },
+          data: nodeData,
+          zIndex: node.zIndex || 1,
+        };
+      });
 
-    // setNodes(updatedNodes);
-    // setEdges(diagramData.edges);
-    // setTimeout(() => fitView({ padding: 0.2 }), 100);
-  };
+      const nodeIds = new Set(newNodes.map((n) => n.id));
+      const newEdges = data.edges
+        .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
+        .map((e, i) => ({ id: e.id || `edge-${i}`, ...e }));
 
-  // // Make the callback available globally for the chat component
-  // useEffect(() => {
-  //   window.updateDiagramFromChat = handleDiagramUpdate;
-  //   return () => {
-  //     delete window.updateDiagramFromChat;
-  //   };
-  // }, [handleDiagramUpdate]);
+      setNodes(newNodes);
+      setEdges(newEdges);
+
+      // Reset change detection
+      lastSaveRef.current = JSON.stringify({
+        nodes: newNodes.map((n) => ({ id: n.id, position: n.position })),
+        edges: newEdges.map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+        })),
+      });
+      setHasUnsavedChanges(false);
+
+      setTimeout(() => fitView({ padding: 0.2 }), 100);
+    },
+    [handleEditNode, setNodes, setEdges, fitView]
+  );
 
   const addResizableRectangle = useCallback(
     (type = 'resizableRectangle') => {
@@ -326,7 +494,6 @@ function FlowCanvas({
 
   const addCustomNode = useCallback(
     (initialLabel = 'New Custom Node', type = 'custom') => {
-      console.log('type', type);
       const viewport = getViewport();
       const position = calculateViewportPosition(viewport);
 
@@ -366,7 +533,6 @@ function FlowCanvas({
             nodeType = node.data.image ? 'custom' : 'default';
             nodeData.image = processImagePath(node.data.image);
           } else if (diagramType === 'db_diagram') {
-            console.log('Creating DB node:', nodeType, data);
             nodeType = 'dbTableNode';
           }
 
@@ -398,8 +564,11 @@ function FlowCanvas({
   );
 
   const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
+    (params) => {
+      setEdges((eds) => addEdge(params, eds));
+      checkForChanges();
+    },
+    [setEdges, checkForChanges]
   );
 
   const onDrop = useCallback(
@@ -559,6 +728,7 @@ function FlowCanvas({
       setSelectedNodes([]);
       setSelectedEdges([]);
       setIsModalOpen(false);
+      checkForChanges();
     },
     [
       setNodes,
@@ -567,6 +737,7 @@ function FlowCanvas({
       setSelectedNodes,
       setSelectedEdges,
       setIsModalOpen,
+      checkForChanges,
     ]
   );
 
@@ -604,12 +775,57 @@ function FlowCanvas({
     return '#1a192b';
   }, []);
 
-  // FIX FOR "MAXIMUM UPDATE DEPTH EXCEEDED" ERROR
+  // Handle node drag stop - show change notification
+  const onNodeDragStop = useCallback(
+    (event, node) => {
+      console.log('🎯 Node drag stopped:', node.id);
+      checkForChanges();
+    },
+    [checkForChanges]
+  );
+
+  // Enhanced onNodesChange to detect movements
+  const handleNodesChange = useCallback(
+    (changes) => {
+      onNodesChange(changes);
+
+      const hasPositionChange = changes.some(
+        (change) => change.type === 'position' && change.dragging === false
+      );
+
+      if (hasPositionChange) {
+        checkForChanges();
+      }
+    },
+    [onNodesChange, checkForChanges]
+  );
+
+  // Trigger on edge changes
+  const handleEdgesChange = useCallback(
+    (changes) => {
+      onEdgesChange(changes);
+
+      const hasEdgeChange = changes.some(
+        (change) => change.type === 'add' || change.type === 'remove'
+      );
+
+      if (hasEdgeChange) {
+        checkForChanges();
+      }
+    },
+    [onEdgesChange, checkForChanges]
+  );
+
+  // Callback to receive thread ID from WebSocket component
+  const handleThreadIdChange = useCallback((threadId) => {
+    console.log('🔄 Thread ID updated:', threadId);
+    setCurrentThreadId(threadId);
+  }, []);
+
   useEffect(() => {
     let updatedAnyNode = false;
     const nextNodes = nodes.map((node) => {
       if (node.type === 'styledRectangle' && node.data.showCount) {
-        // Filter regular nodes for intersection check
         const regularNodes = nodes.filter(
           (n) => n.type === 'custom' || n.type === 'dbTableNode'
         );
@@ -627,7 +843,6 @@ function FlowCanvas({
           )
         ).length;
 
-        // Only create a new node object (and trigger an update) if the count has actually changed
         if (overlappingCount !== node.data.nodeCount) {
           updatedAnyNode = true;
           return {
@@ -636,14 +851,13 @@ function FlowCanvas({
           };
         }
       }
-      return node; // Return the node as is if no update needed
+      return node;
     });
 
-    // Only call setNodes if at least one node's data (nodeCount) was actually modified
     if (updatedAnyNode) {
       setNodes(nextNodes);
     }
-  }, [nodes, setNodes]); // Keep nodes and setNodes in dependencies
+  }, [nodes, setNodes]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -666,7 +880,7 @@ function FlowCanvas({
             e.preventDefault();
             addResizableRectangle('styledRectangle');
             break;
-          case 'n': // Ctrl/Cmd + N for new custom node
+          case 'n':
             e.preventDefault();
             addCustomNode();
             break;
@@ -686,8 +900,27 @@ function FlowCanvas({
     addCustomNode,
   ]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (statusTimeoutRef.current) {
+        clearTimeout(statusTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <>
+      {/* Change Notification Popover */}
+      <ChangeNotificationPopover
+        isVisible={hasUnsavedChanges && !isSaving}
+        onUpdate={handleManualUpdate}
+        isSaving={isSaving}
+      />
+
+      {/* Save Status Toast */}
+      <SaveStatusToast status={saveStatus} message={saveMessage} />
+
       {loading && (
         <div className='fixed inset-0 z-[1000] flex items-center justify-center bg-white bg-opacity-70'>
           <div className='w-12 h-12 rounded-full border-4 border-blue-500 border-t-transparent animate-spin' />
@@ -717,9 +950,10 @@ function FlowCanvas({
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
+          onNodeDragStop={onNodeDragStop}
           onSelectionChange={handleSelectionChange}
           nodeTypes={NODE_TYPES}
           fitView
@@ -756,15 +990,12 @@ function FlowCanvas({
         )}
       </div>
 
-      {/* <ChatInput onSubmit={handleGenerateDiagram} /> */}
-      <FloatingChatWebSocket handleGenerateDiagram={handleDiagramUpdate} />
-      {/* <FloatingChatButton
-        // apiBaseUrl='http://localhost:8000'
+      <FloatingChatWebSocket
         handleGenerateDiagram={handleDiagramUpdate}
-      /> */}
+        onThreadIdChange={handleThreadIdChange}
+      />
     </>
   );
 }
 
-// Export the component directly, not wrapped in ReactFlowProvider here
 export default FlowCanvas;
