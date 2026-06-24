@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.2.1",
+    "@hookform/resolvers": "^5.4.0",
     "@monaco-editor/react": "^4.7.0",
     "@reduxjs/toolkit": "^2.8.2",
     "@tailwindcss/vite": "^4.1.11",
@@ -18,16 +18,16 @@
     "file-saver": "^2.0.5",
     "jszip": "^3.10.1",
     "lucide-react": "^0.525.0",
-    "modern-screenshot": "^4.6.6",
+    "modern-screenshot": "^4.7.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-hook-form": "^7.62.0",
+    "react-hook-form": "^7.80.0",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.7.0",
     "react-split": "^2.0.14",
     "reactflow": "^11.11.4",
     "tailwindcss": "^4.1.11",
-    "yup": "^1.7.0"
+    "yup": "^1.7.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
